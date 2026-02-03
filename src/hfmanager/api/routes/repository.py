@@ -1,4 +1,4 @@
-from huggingface_hub import create_repo, upload_file, HfApi, RepoCard, delete_repo, move_repo, update_repo_visibility, delete_file
+from huggingface_hub import create_repo, upload_file, HfApi, RepoCard, delete_repo, move_repo, delete_file
 from huggingface_hub.utils import HfHubHTTPError
 import os
 from ..models.repository import CreateRepoRequest, UploadFileRequest, RepoActionResponse, UpdateMetadataRequest, UpdateVisibilityRequest, MoveRepoRequest, ImportRepoRequest, ConvertRepoRequest
@@ -154,7 +154,8 @@ def update_repo_metadata(request: UpdateMetadataRequest, token: str = Depends(ge
 @router.put("/visibility", response_model=RepoActionResponse)
 def set_visibility(request: UpdateVisibilityRequest, token: str = Depends(get_auth_token)):
     try:
-        update_repo_visibility(repo_id=request.repo_id, private=request.private, repo_type=request.repo_type, token=token)
+        api = HfApi(token=token)
+        api.update_repo_settings(repo_id=request.repo_id, private=request.private, repo_type=request.repo_type)
         return RepoActionResponse(success=True, message="Visibility updated")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
