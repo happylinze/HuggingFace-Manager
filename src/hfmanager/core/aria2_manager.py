@@ -126,14 +126,31 @@ class Aria2Service:
             cmd.append(f"--all-proxy={proxy}")
         
         try:
+            # CREATE_NO_WINDOW = 0x08000000
+            creationflags = 0x08000000 if os.name == 'nt' else 0
+            
             self._process = subprocess.Popen(
                 cmd, 
-                stdout=subprocess.DEVNULL, 
-                stderr=subprocess.DEVNULL
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE,
+                creationflags=creationflags,
+                text=True
             )
-            logger.info(f"Started Aria2 process with PID {self._process.pid}")
-            # Wait for startup
-            time.sleep(1)
+            
+            # Check for immediate failure
+            try:
+                stdout, stderr = self._process.communicate(timeout=0.5)
+                # If command finishes quickly, it likely failed
+                logger.error(f"Aria2 exited immediately with code {self._process.returncode}")
+                logger.error(f"STDOUT: {stdout}")
+                logger.error(f"STDERR: {stderr}")
+                self._process = None
+                return
+            except subprocess.TimeoutExpired:
+                # Process is running successfully
+                logger.info(f"Started Aria2 process with PID {self._process.pid} on port {self.port}")
+                pass
+                
         except Exception as e:
             logger.error(f"Failed to start Aria2: {e}")
 
