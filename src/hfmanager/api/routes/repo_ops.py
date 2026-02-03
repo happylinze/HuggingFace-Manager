@@ -5,7 +5,7 @@ from ...core.cache_manager import CacheManager
 from ..dependencies import get_cache_manager
 from ...core.auth_manager import get_auth_manager
 from ...api.models.repository import RepoActionResponse, UpdateMetadataRequest, UpdateVisibilityRequest, MoveRepoRequest
-from huggingface_hub import RepoCard, HfApi, delete_repo, move_repo, update_repo_visibility, delete_file
+from huggingface_hub import RepoCard, HfApi, delete_repo, move_repo, delete_file
 
 router = APIRouter(prefix="/repos", tags=["RepoOps"])
 
@@ -198,11 +198,11 @@ def set_visibility(request: UpdateVisibilityRequest):
         if not token:
              raise HTTPException(status_code=401, detail="Please login first")
              
-        update_repo_visibility(
+        api = HfApi(token=token)
+        api.update_repo_settings(
             repo_id=request.repo_id, 
             private=request.private, 
-            repo_type=request.repo_type if request.repo_type != 'model' else None,
-            token=token
+            repo_type=request.repo_type if request.repo_type != 'model' else None
         )
         return RepoActionResponse(
             success=True, 
