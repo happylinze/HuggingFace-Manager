@@ -16,7 +16,10 @@ class GGUFConverter:
         self.downloader = downloader
         self.plugin_manager = plugin_manager
 
-    def get_tool_path(self, tool_name: str = "llama-quantize.exe") -> Optional[str]:
+    def get_tool_path(self, tool_name: Optional[str] = None) -> Optional[str]:
+        if tool_name is None:
+            tool_name = "llama-quantize.exe" if os.name == 'nt' else "llama-quantize"
+            
         status = self.plugin_manager.get_plugin_status("llama_cpp")
         if status["status"] != "installed":
             return None
@@ -37,9 +40,9 @@ class GGUFConverter:
         is_gguf_input = input_path.lower().endswith('.gguf')
         
         if is_gguf_input:
-            tool_path = self.get_tool_path("llama-quantize.exe")
+            tool_path = self.get_tool_path()
             if not tool_path:
-                 raise ValueError("llama-quantize tool not found. Please install the plugin.")
+                 raise ValueError("Quantization tool not found. Please install the plugin.")
             
             cmd = [
                 tool_path,

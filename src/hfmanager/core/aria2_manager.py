@@ -24,7 +24,7 @@ class Aria2Service:
         self._ensure_process_running()
 
     def _cleanup_zombie_processes(self):
-        """Clean up any existing aria2c.exe processes to avoid port conflicts."""
+        """Clean up any existing aria2c processes to avoid port conflicts."""
         if os.name == 'nt':
             try:
                 # Use taskkill to kill all aria2c.exe processes
@@ -34,12 +34,23 @@ class Aria2Service:
                 time.sleep(0.5) # Give OS time to release ports
             except Exception as e:
                 logger.warning(f"Failed to cleanup aria2c processes: {e}")
+        else:
+            try:
+                # Use pkill on Linux/Mac
+                subprocess.run(['pkill', '-f', 'aria2c'], 
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                logger.info("Cleaned up existing aria2c processes")
+                time.sleep(0.5)
+            except Exception:
+                pass
 
     def _get_binary_path(self) -> Path:
-        """Locate aria2c.exe binary."""
+        """Locate aria2c binary."""
+        binary_name = "aria2c.exe" if os.name == 'nt' else "aria2c"
+        
         # Check resources/bin relative to this file
         current_dir = Path(__file__).parent.parent 
-        bin_path = current_dir / "resources" / "bin" / "aria2c.exe"
+        bin_path = current_dir / "resources" / "bin" / binary_name
         if bin_path.exists():
             return bin_path
         
@@ -49,7 +60,7 @@ class Aria2Service:
         if sys_path:
             return Path(sys_path)
             
-        return Path("aria2c.exe") # Hope it's in CWD
+        return Path(binary_name) # Hope it's in CWD
 
     def _ensure_process_running(self):
         """Start aria2c daemon if not running."""
