@@ -47,43 +47,43 @@
 <table style="width: 100%; border-collapse: collapse;">
   <tr>
     <td align="center" style="padding: 5px; width: 33.3%;">
-      <img src="./assets/img/search_main.png" alt="Search" style="border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/search_main.png" alt="Search" style="width: 100%; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
       <sub>🔎 资源搜索</sub>
     </td>
     <td align="center" style="padding: 5px; width: 33.3%;">
-      <img src="./assets/img/download_queue.png" alt="Queue" style="border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/download_queue.png" alt="Queue" style="width: 100%; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
       <sub>🚀 下载队列</sub>
     </td>
     <td align="center" style="padding: 5px; width: 33.3%;">
-      <img src="./assets/img/batch_download.png" alt="Filter" style="border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/batch_download.png" alt="Filter" style="width: 100%; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
       <sub>🔍 定向筛选</sub>
     </td>
   </tr>
   <tr>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/cache_main.png" alt="Cache" style="border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/cache_main.png" alt="Cache" style="width: 100%; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
       <sub>📊 缓存统计</sub>
     </td>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/cache_list.png" alt="Cache List" style="border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/cache_list.png" alt="Cache List" style="width: 100%; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
       <sub>📃 缓存列表</sub>
     </td>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/my_repos.png" alt="Repos" style="border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/my_repos.png" alt="Repos" style="width: 100%; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
       <sub>📦 个人仓库</sub>
     </td>
   </tr>
   <tr>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/gguf_quant.png" alt="Quant" style="border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/gguf_quant.png" alt="Quant" style="width: 100%; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
       <sub>⚙️ GGUF量化</sub>
     </td>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/theme_comparison.png" alt="Themes" style="border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/theme_comparison.png" alt="Themes" style="width: 100%; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
       <sub>🌓 深浅模式</sub>
     </td>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/settings_main.png" alt="Settings" style="border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/settings_main.png" alt="Settings" style="width: 100%; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
       <sub>🛠️ 全局设置</sub>
     </td>
   </tr>
