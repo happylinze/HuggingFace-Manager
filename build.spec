@@ -63,6 +63,7 @@ a = Analysis(
         'email.mime.text',
         # PyWebView for native window
         'webview',
+        'requests',
     ] + ([
         'webview.platforms.edgechromium',
         'clr_loader',
