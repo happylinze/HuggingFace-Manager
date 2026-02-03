@@ -39,7 +39,6 @@ Thumbs.db
 
 # Build artifacts
 frontend/dist/
-*.exe
 local_build.bat
 setup_env.bat
 start_dev.bat

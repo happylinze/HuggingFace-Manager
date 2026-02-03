@@ -54,11 +54,17 @@ jobs:
       - name: Setup Aria2 (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          # Use the committed binary or download if needed
-          # For now, we trust the repo structure has src/hfmanager/resources/bin/aria2c.exe
+          # Use the committed binary or download via Chocolatey if missing
           if (-not (Test-Path "src/hfmanager/resources/bin/aria2c.exe")) {
-            echo "Warning: aria2c.exe not found in repo, please ensure it is committed."
-            exit 1
+            echo "aria2c.exe not found in repo, installing via Chocolatey..."
+            choco install aria2 --no-progress
+            if (-not (Test-Path "src/hfmanager/resources/bin")) {
+               mkdir "src/hfmanager/resources/bin"
+            }
+            # Typical choco path
+            Copy-Item "C:\ProgramData\chocolatey\bin\aria2c.exe" -Destination "src/hfmanager/resources/bin\aria2c.exe"
+          } else {
+            echo "Using bundled aria2c.exe"
           }
 
       - name: Setup Aria2 (Linux)
