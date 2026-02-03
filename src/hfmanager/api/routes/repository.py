@@ -1,4 +1,4 @@
-from huggingface_hub import create_repo, upload_file, HfApi, RepoCard, delete_repo, move_repo, delete_file
+from huggingface_hub import HfApi, RepoCard
 from huggingface_hub.utils import HfHubHTTPError
 import os
 from ..models.repository import CreateRepoRequest, UploadFileRequest, RepoActionResponse, UpdateMetadataRequest, UpdateVisibilityRequest, MoveRepoRequest, ImportRepoRequest, ConvertRepoRequest
@@ -29,11 +29,11 @@ def create_repository(request: CreateRepoRequest, token: str = Depends(get_auth_
     """Create a new Hugging Face repository."""
     try:
         print(f"Creating repo: {request.repo_id}")
-        url = create_repo(
+        api = HfApi(token=token)
+        url = api.create_repo(
             repo_id=request.repo_id,
             repo_type=request.repo_type,
             private=request.private,
-            token=token,
             exist_ok=False,
             space_sdk=request.sdk if request.repo_type == 'space' else None
         )
@@ -73,12 +73,12 @@ def upload_repo_file(request: UploadFileRequest, token: str = Depends(get_auth_t
         if not os.path.exists(request.file_path):
              raise HTTPException(status_code=400, detail=f"Local file not found: {request.file_path}")
 
-        result = upload_file(
+        api = HfApi(token=token)
+        result = api.upload_file(
             path_or_fileobj=request.file_path,
             path_in_repo=request.path_in_repo or os.path.basename(request.file_path),
             repo_id=request.repo_id,
             repo_type=request.repo_type,
-            token=token,
             commit_message=request.commit_message
         )
         
@@ -106,12 +106,12 @@ def upload_multipart(
     """Upload a file via multipart form data (Drag & Drop)."""
     try:
         # Use file.file which is a SpooledTemporaryFile
-        upload_file(
+        api = HfApi(token=token)
+        api.upload_file(
             path_or_fileobj=file.file,
             path_in_repo=path_in_repo,
             repo_id=repo_id,
             repo_type=repo_type if repo_type != 'model' else None,
-            token=token,
             commit_message=commit_message
         )
         return RepoActionResponse(success=True, message=f"Uploaded {path_in_repo}")
@@ -163,7 +163,8 @@ def set_visibility(request: UpdateVisibilityRequest, token: str = Depends(get_au
 @router.post("/move", response_model=RepoActionResponse)
 def transport_repo(request: MoveRepoRequest, token: str = Depends(get_auth_token)):
     try:
-        move_repo(from_id=request.from_repo, to_id=request.to_repo, repo_type=request.repo_type, token=token)
+        api = HfApi(token=token)
+        api.move_repo(from_id=request.from_repo, to_id=request.to_repo, repo_type=request.repo_type)
         return RepoActionResponse(success=True, message=f"Moved to {request.to_repo}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -171,7 +172,8 @@ def transport_repo(request: MoveRepoRequest, token: str = Depends(get_auth_token
 @router.delete("/delete", response_model=RepoActionResponse)
 def remove_repo(repo_id: str, repo_type: str, token: str = Depends(get_auth_token)):
     try:
-        delete_repo(repo_id=repo_id, repo_type=repo_type, token=token)
+        api = HfApi(token=token)
+        api.delete_repo(repo_id=repo_id, repo_type=repo_type)
         return RepoActionResponse(success=True, message=f"Deleted {repo_id}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -179,7 +181,8 @@ def remove_repo(repo_id: str, repo_type: str, token: str = Depends(get_auth_toke
 @router.delete("/file", response_model=RepoActionResponse)
 def remove_file(repo_id: str, path: str, repo_type: str, token: str = Depends(get_auth_token)):
     try:
-        delete_file(path_in_repo=path, repo_id=repo_id, repo_type=repo_type, token=token, commit_message=f"Delete {path}")
+        api = HfApi(token=token)
+        api.delete_file(path_in_repo=path, repo_id=repo_id, repo_type=repo_type, commit_message=f"Delete {path}")
         return RepoActionResponse(success=True, message=f"Deleted {path}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

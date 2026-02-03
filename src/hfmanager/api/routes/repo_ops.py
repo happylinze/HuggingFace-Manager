@@ -5,7 +5,7 @@ from ...core.cache_manager import CacheManager
 from ..dependencies import get_cache_manager
 from ...core.auth_manager import get_auth_manager
 from ...api.models.repository import RepoActionResponse, UpdateMetadataRequest, UpdateVisibilityRequest, MoveRepoRequest
-from huggingface_hub import RepoCard, HfApi, delete_repo, move_repo, delete_file
+from huggingface_hub import RepoCard, HfApi
 
 router = APIRouter(prefix="/repos", tags=["RepoOps"])
 
@@ -166,11 +166,11 @@ def delete_file_endpoint(repo_type: str, repo_id: str, path: str):
         if not token:
              raise HTTPException(status_code=401, detail="Please login first")
              
-        delete_file(
+        api = HfApi(token=token)
+        api.delete_file(
             path_in_repo=path,
             repo_id=repo_id,
             repo_type=repo_type if repo_type != 'model' else None,
-            token=token,
             commit_message=f"Delete {path} via HFManager"
         )
         return RepoActionResponse(success=True, message=f"Deleted {path}")
@@ -185,7 +185,8 @@ def delete_repository_endpoint(repo_type: str, repo_id: str):
         if not token:
              raise HTTPException(status_code=401, detail="Please login first")
              
-        delete_repo(repo_id=repo_id, repo_type=repo_type if repo_type != 'model' else None, token=token)
+        api = HfApi(token=token)
+        api.delete_repo(repo_id=repo_id, repo_type=repo_type if repo_type != 'model' else None)
         return RepoActionResponse(success=True, message=f"Deleted {repo_type} {repo_id}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -219,11 +220,11 @@ def move_repository_endpoint(request: MoveRepoRequest):
         if not token:
              raise HTTPException(status_code=401, detail="Please login first")
              
-        move_repo(
+        api = HfApi(token=token)
+        api.move_repo(
             from_id=request.from_repo,
             to_id=request.to_repo,
-            repo_type=request.repo_type if request.repo_type != 'model' else None,
-            token=token
+            repo_type=request.repo_type if request.repo_type != 'model' else None
         )
         return RepoActionResponse(
             success=True, 
