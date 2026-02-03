@@ -26,6 +26,8 @@ a = Analysis(
     datas=[
         # Include the frontend dist folder
         (str(frontend_dist), 'frontend/dist'),
+        # Include resources (aria2c.exe etc)
+        (str(src_dir / 'hfmanager' / 'resources'), 'hfmanager/resources'),
     ],
     hiddenimports=[
         # Uvicorn internals

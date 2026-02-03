@@ -51,6 +51,34 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Setup Aria2 (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          # Use the committed binary or download if needed
+          # For now, we trust the repo structure has src/hfmanager/resources/bin/aria2c.exe
+          if (-not (Test-Path "src/hfmanager/resources/bin/aria2c.exe")) {
+            echo "Warning: aria2c.exe not found in repo, please ensure it is committed."
+            exit 1
+          }
+
+      - name: Setup Aria2 (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aria2
+          mkdir -p src/hfmanager/resources/bin
+          cp $(which aria2c) src/hfmanager/resources/bin/aria2c
+          # Remove potential Windows binary if it exists from git clone
+          rm -f src/hfmanager/resources/bin/aria2c.exe
+
+      - name: Setup Aria2 (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install aria2
+          mkdir -p src/hfmanager/resources/bin
+          cp $(which aria2c) src/hfmanager/resources/bin/aria2c
+          rm -f src/hfmanager/resources/bin/aria2c.exe
+
       - name: Build with PyInstaller
         run: |
           pyinstaller build.spec

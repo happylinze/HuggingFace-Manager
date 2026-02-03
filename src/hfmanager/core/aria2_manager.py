@@ -48,7 +48,16 @@ class Aria2Service:
         """Locate aria2c binary."""
         binary_name = "aria2c.exe" if os.name == 'nt' else "aria2c"
         
-        # Check resources/bin relative to this file
+        # 1. Handle Frozen Environment (PyInstaller)
+        if getattr(sys, 'frozen', False):
+            # In one-file mode, sys._MEIPASS is the temp folder
+            # We bundled it to 'hfmanager/resources' in build.spec
+            base_path = Path(sys._MEIPASS)
+            bin_path = base_path / "hfmanager" / "resources" / "bin" / binary_name
+            if bin_path.exists():
+                return bin_path
+                
+        # 2. Check resources/bin relative to this file (Dev Mode)
         current_dir = Path(__file__).parent.parent 
         bin_path = current_dir / "resources" / "bin" / binary_name
         if bin_path.exists():
