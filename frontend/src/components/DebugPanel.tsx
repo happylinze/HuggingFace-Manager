@@ -110,7 +110,7 @@ export function DebugPanel({ tasks = [] }: { tasks?: any[] }) {
                     {/* Content */}
                     <div
                         ref={logContainerRef}
-                        className="flex-1 overflow-y-auto p-2 font-mono text-xs space-y-1"
+                        className="flex-1 overflow-y-auto p-2 font-mono text-xs space-y-1 select-text"
                     >
                         {activeTab === 'LOGS' ? (
                             logs.length === 0 ? (
