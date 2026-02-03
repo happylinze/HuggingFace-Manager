@@ -1,0 +1,324 @@
+@import "tailwindcss";
+/* @plugin "@tailwindcss/typography"; */
+
+/* HFManager Design System */
+@theme {
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-secondary: var(--color-secondary);
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-surface-hover: var(--color-surface-hover);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-border: var(--color-border);
+  --color-error: var(--color-error);
+  --color-warning: var(--color-warning);
+  --color-success: var(--color-success);
+}
+
+:root {
+  /* Light Theme (Premium Clean) */
+  --color-primary: #4b7dca;
+  /* muted-blue */
+  --color-primary-hover: #3b6db9;
+  /* muted-blue-hover */
+  --color-secondary: #059669;
+  /* emerald-600 */
+
+  --color-background: #ffffff;
+  /* pure white */
+  --color-surface: #f8fafc;
+  /* slate-50 */
+  --color-surface-hover: #f1f5f9;
+  /* slate-100 */
+
+  --color-text: #0f172a;
+  /* slate-900 */
+  --color-text-muted: #64748b;
+  /* slate-500 */
+
+  --color-border: #e2e8f0;
+  /* slate-200 */
+
+  --color-error: #ef4444;
+  /* red-500 */
+  --color-warning: #f59e0b;
+  /* amber-500 */
+  --color-success: #10b981;
+  /* emerald-500 */
+
+  /* Shadows - Light (Diffuse & Soft) */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08);
+}
+
+.dark {
+  /* Dark Theme (Deep Space) */
+  --color-primary: #818cf8;
+  /* indigo-400 (Lighter for dark mode) */
+  --color-primary-hover: #6366f1;
+  /* indigo-500 */
+  --color-secondary: #34d399;
+  /* emerald-400 */
+
+  --color-background: #0f172a;
+  /* slate-900 */
+  --color-surface: #1e293b;
+  /* slate-800 */
+  --color-surface-hover: #334155;
+  /* slate-700 */
+
+  --color-text: #f8fafc;
+  /* slate-50 */
+  --color-text-muted: #94a3b8;
+  /* slate-400 */
+
+  --color-border: #334155;
+  /* slate-700 */
+
+  /* Keep base colors vibrant */
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --color-success: #10b981;
+
+  /* Shadows - Dark (Glows) */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+}
+
+:root {
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  /* Border Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-full: 9999px;
+
+  /* Typography */
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: var(--color-text);
+  background-color: var(--color-background);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Global transition for smooth theme switching */
+}
+
+*,
+*::before,
+*::after {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Utility classes */
+.glass {
+  background: var(--color-surface);
+  /* Use semantic surface */
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border);
+  background-color: color-mix(in srgb, var(--color-surface) 90%, transparent);
+}
+
+.gradient-primary {
+  background: linear-gradient(135deg, var(--color-primary) 0%, #8b5cf6 100%);
+}
+
+/* Animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Markdown Styles (Refactored for Theming) */
+.markdown-body h1 {
+  @apply text-2xl font-bold mt-6 mb-4 pb-2 border-b;
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.markdown-body h2 {
+  @apply text-xl font-bold mt-6 mb-3;
+  color: var(--color-text);
+}
+
+.markdown-body h3 {
+  @apply text-lg font-bold mt-4 mb-2;
+  color: var(--color-text);
+}
+
+.markdown-body p {
+  @apply mb-4 leading-relaxed;
+  color: var(--color-text);
+}
+
+.markdown-body ul {
+  @apply list-disc list-inside mb-4 space-y-1;
+  color: var(--color-text);
+}
+
+.markdown-body ol {
+  @apply list-decimal list-inside mb-4 space-y-1;
+  color: var(--color-text);
+}
+
+.markdown-body li {
+  @apply marker:text-slate-500;
+}
+
+.markdown-body a {
+  @apply underline underline-offset-4;
+  color: var(--color-primary);
+  text-decoration-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
+.markdown-body a:hover {
+  text-decoration-color: var(--color-primary);
+}
+
+.markdown-body pre {
+  @apply p-4 rounded-lg overflow-x-auto mb-6 border;
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+/* In dark mode, code blocks are usually darker than surface */
+.dark .markdown-body pre {
+  background-color: #020617;
+  /* Very dark slate for contrast */
+}
+
+.markdown-body code {
+  @apply px-1.5 py-0.5 rounded text-sm font-mono border;
+  background-color: var(--color-surface-hover);
+  color: var(--color-primary);
+  border-color: var(--color-border);
+}
+
+.markdown-body pre code {
+  @apply bg-transparent p-0 border-none;
+  color: var(--color-text);
+}
+
+.markdown-body blockquote {
+  @apply border-l-4 pl-4 py-1 mb-4 italic rounded-r;
+  border-color: var(--color-primary);
+  background-color: var(--color-surface-hover);
+  color: var(--color-text-muted);
+}
+
+.markdown-body table {
+  @apply w-full mb-6 border-collapse text-sm;
+}
+
+.markdown-body th {
+  @apply border p-3 text-left font-semibold;
+  border-color: var(--color-border);
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.markdown-body td {
+  @apply border p-3;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.markdown-body img {
+  @apply max-w-full rounded-lg my-6 shadow-lg border;
+  border-color: var(--color-border);
+}
+
+.markdown-body hr {
+  @apply my-8;
+  border-color: var(--color-border);
+}
+
+html {
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+}
+
+/* Global Modern Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-text-muted) 30%, transparent);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--color-text-muted) 50%, transparent);
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-text-muted) 30%, transparent) transparent;
+}

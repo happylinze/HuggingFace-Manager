@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+crash.log
+server.log
+
+# Temp files
+tmp_*.txt
+*.tmp
+
+# Cache
+.cache/
+*.json.bak
+user_cache.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Build artifacts
+frontend/dist/
+*.exe
+# *.spec
+
+# Test downloads
+temp_download_test/
+test_downloads/
+aria2_test_download/
+
+# Debug outputs
+debug_*.txt
