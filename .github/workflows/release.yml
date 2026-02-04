@@ -11,12 +11,13 @@ jobs:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
         include:
           - os: windows-latest
-            artifact_name: HFManager-Windows.exe
-            dist_path: dist/HFManager.exe
+            artifact_name: HFManager-Windows
+            dist_path: dist/HFManager
           - os: macos-latest
             artifact_name: HFManager-MacOS
             dist_path: dist/HFManager
@@ -54,15 +55,13 @@ jobs:
       - name: Setup Aria2 (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          # Use the committed binary or download via Chocolatey if missing
+          if (-not (Test-Path "src/hfmanager/resources/bin")) {
+            mkdir "src/hfmanager/resources/bin"
+          }
           if (-not (Test-Path "src/hfmanager/resources/bin/aria2c.exe")) {
             echo "aria2c.exe not found in repo, installing via Chocolatey..."
             choco install aria2 --no-progress
-            if (-not (Test-Path "src/hfmanager/resources/bin")) {
-               mkdir "src/hfmanager/resources/bin"
-            }
-            # Typical choco path
-            Copy-Item "C:\ProgramData\chocolatey\bin\aria2c.exe" -Destination "src/hfmanager/resources/bin\aria2c.exe"
+            Copy-Item "C:\ProgramData\chocolatey\bin\aria2c.exe" -Destination "src/hfmanager/resources/bin/aria2c.exe"
           } else {
             echo "Using bundled aria2c.exe"
           }
@@ -74,20 +73,19 @@ jobs:
           sudo apt-get install -y aria2
           mkdir -p src/hfmanager/resources/bin
           cp $(which aria2c) src/hfmanager/resources/bin/aria2c
-          # Remove potential Windows binary if it exists from git clone
           rm -f src/hfmanager/resources/bin/aria2c.exe
 
       - name: Setup Aria2 (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          brew install aria2
+          brew install aria2 || echo "aria2 already installed or brew failed, continuing..."
           mkdir -p src/hfmanager/resources/bin
           cp $(which aria2c) src/hfmanager/resources/bin/aria2c
           rm -f src/hfmanager/resources/bin/aria2c.exe
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller build.spec
+          pyinstaller hfmanager.spec
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -104,13 +102,19 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
 
+      - name: Zip Artifacts (Linux/macOS)
+        run: |
+          zip -r HFManager-Windows.zip HFManager-Windows/
+          zip -r HFManager-MacOS.zip HFManager-MacOS/
+          zip -r HFManager-Linux.zip HFManager-Linux/
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            HFManager-Windows.exe/HFManager.exe
-            HFManager-MacOS/HFManager
-            HFManager-Linux/HFManager
+            HFManager-Windows.zip
+            HFManager-MacOS.zip
+            HFManager-Linux.zip
           draft: false
           prerelease: false
         env:
