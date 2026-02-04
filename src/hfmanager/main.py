@@ -76,6 +76,7 @@ Examples:
     server_parser = subparsers.add_parser("server", help="Start the Web UI & API server (Default)")
     server_parser.add_argument("--host", default=os.environ.get("HF_HOST", "127.0.0.1"), help="Host to bind (default: 127.0.0.1)")
     server_parser.add_argument("--port", type=int, default=int(os.environ.get("HF_PORT", "8000")), help="Port to bind (default: 8000)")
+    server_parser.add_argument("--web", action="store_true", help="Force run in Web Browser mode (Disable Desktop Window)")
 
     # --- SEARCH command ---
     search_parser = subparsers.add_parser("search", help="Search Hugging Face from terminal")
@@ -101,12 +102,12 @@ Examples:
     # Default to 'server' if no command provided
     if not args.command:
         # Check if any unknown args were passed that might look like server flags
-        # But for now, just run server
-        run_server("127.0.0.1", 8000)
+        # But for now, just run server with default args (webview enabled unless failed)
+        run_app(host="127.0.0.1", port=8000, web_mode=False)
         return
 
     if args.command == "server":
-        run_server(args.host, args.port)
+        run_app(args.host, args.port, args.web)
     
     elif args.command == "search":
         from hfmanager.core.cli_handler import run_search
@@ -123,9 +124,9 @@ Examples:
         else:
             run_cache()
 
-def run_server(host, port):
-    """Starts the Uvicorn server with dynamic port and auto-open browser."""
-    from hfmanager.server import start, find_free_port, static_dir
+def run_app(host, port, web_mode=False):
+    """Start the application (Desktop or Web mode)."""
+    from hfmanager.server import start, find_free_port, static_dir, app
     
     # Use dynamic port if the specified port is not available
     try:
@@ -135,11 +136,51 @@ def run_server(host, port):
     except RuntimeError as e:
         logger.error(str(e))
         return
+
+    # Determine mode
+    force_web = web_mode
+    is_frozen = getattr(sys, 'frozen', False)
     
-    logger.info(f"Starting Hugging Face Manager Engine on http://{host}:{actual_port}")
+    # Check if desktop libs are available
+    has_desktop_libs = False
+    try:
+        import webview
+        import pystray
+        has_desktop_libs = True
+    except ImportError:
+        pass
+
+    # Logic:
+    # If --web passed: WEB MODE
+    # If Libs missing: WEB MODE (Fallback)
+    # Else: DESKTOP MODE
     
-    # Start with browser auto-open if frontend is built
-    start(dev_mode=False, open_browser=static_dir.exists(), port=actual_port)
+    if force_web or not has_desktop_libs:
+        logger.info(f"Starting in Web Mode on http://{host}:{actual_port}")
+        start(dev_mode=False, open_browser=True, port=actual_port, use_webview=False)
+    else:
+        logger.info(f"Starting in Desktop Mode on http://{host}:{actual_port}")
+        try:
+            from hfmanager.core.desktop import DesktopManager, desktop_instance
+            import hfmanager.core.desktop as desktop_module
+            
+            # Initialize Manager
+            manager = DesktopManager(app, host, actual_port)
+            
+            # Set global instance for API access
+            desktop_module.desktop_instance = manager
+            
+            # Check Single Instance Lock
+            if not manager.check_single_instance():
+                logger.info("Instance already running. Signal sent. Exiting.")
+                return
+
+            # Run (Blocks Main Thread)
+            manager.run()
+            
+        except Exception as e:
+            logger.error(f"Failed to start Desktop Mode: {e}. Fallback to Web.")
+            start(dev_mode=False, open_browser=True, port=actual_port, use_webview=False)
 
 if __name__ == "__main__":
     main()

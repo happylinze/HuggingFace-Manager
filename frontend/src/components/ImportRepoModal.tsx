@@ -100,7 +100,11 @@ export function ImportRepoModal({ isOpen, onClose, onSuccess }: ImportRepoModalP
         try {
             const result = await importRepo(formData);
             if (result.success) {
-                if (onSuccess && result.url) onSuccess(result.url);
+                if (onSuccess) {
+                    // Force official URL for browser navigation
+                    const officialUrl = `https://huggingface.co/${formData.repo_type === 'model' ? '' : formData.repo_type === 'dataset' ? 'datasets/' : 'spaces/'}${formData.repo_id}`;
+                    onSuccess(officialUrl);
+                }
                 onClose();
             }
         } catch (err) {

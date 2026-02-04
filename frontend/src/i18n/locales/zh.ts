@@ -267,7 +267,9 @@ export const zh = {
             aria2Title: 'Aria2 Turbo',
             aria2Desc: '多线程下载器。极速下载，支持暂停/断点续传。',
             validationTitle: '环境检查结果',
-            validationDesc: '检查 Aria2 是否已正确安装并可用'
+            validationDesc: '检查 Aria2 是否已正确安装并可用',
+            autoResume: '启动自动恢复下载',
+            autoResumeDesc: '应用程序启动时自动尝试继续未完成的任务'
         },
         cache: {
             path: '系统缓存路径 (HF_HOME)',

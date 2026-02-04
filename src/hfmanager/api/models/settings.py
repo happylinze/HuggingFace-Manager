@@ -48,6 +48,8 @@ class SettingsResponse(BaseModel):
     show_trending_repos: bool = True
     debug_mode: bool = False
     app_data_dir: Optional[str] = ""
+    auto_resume_incomplete: bool = False
+    language: str = "en"
 
 class UpdateSettingsRequest(BaseModel):
     download_dir: Optional[str] = None
@@ -72,6 +74,8 @@ class UpdateSettingsRequest(BaseModel):
     show_trending_tags: Optional[bool] = None
     show_trending_repos: Optional[bool] = None
     debug_mode: Optional[bool] = None
+    auto_resume_incomplete: Optional[bool] = None
+    language: Optional[str] = None
 
 class ValidateTokenRequest(BaseModel):
     token: str

@@ -559,6 +559,10 @@ export function MyReposPage() {
                 repoType={detailsModal.repoType}
                 initialTab={detailsModal.initialTab}
                 onDownload={() => { }}
+                onRefresh={() => {
+                    setDetailsModal({ ...detailsModal, isOpen: false });
+                    loadUserAndRepos(true);
+                }}
             />
         </div >
     );

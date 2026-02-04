@@ -254,7 +254,7 @@ export function DownloadTaskCard({
 
             {/* Expanded Content */}
             <div className={`grid transition-all duration-300 ease-in-out ${isExpanded ? 'grid-rows-[1fr] opacity-100 mt-4' : 'grid-rows-[0fr] opacity-0 mt-0'}`} onClick={(e) => e.stopPropagation()}>
-                <div className="overflow-hidden min-h-0">
+                <div className="overflow-hidden min-h-0 selectable">
                     {/* Tags removed from here as they are now in header */}
 
                     {/* Progress Bar Area */}

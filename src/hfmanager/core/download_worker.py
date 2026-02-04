@@ -70,7 +70,28 @@ def download_worker_entry(
             os.environ["ALL_PROXY"] = proxy_url
             logger.info(f"Proxy Configured in Worker: {proxy_url}")
         else:
-            logger.info("No Proxy Configured in Worker (Direct Connection)")
+            # Auto-detect System Proxy if not explicit
+            try:
+                from urllib.request import getproxies
+                sys_proxies = getproxies()
+                detected_proxy = None
+                
+                if 'all' in sys_proxies: 
+                    detected_proxy = sys_proxies['all']
+                elif 'https' in sys_proxies and (not endpoint or 'https' in endpoint):
+                    detected_proxy = sys_proxies['https']
+                elif 'http' in sys_proxies:
+                    detected_proxy = sys_proxies['http']
+                    
+                if detected_proxy:
+                    logger.info(f"Worker: Auto-detected System Proxy: {detected_proxy}")
+                    os.environ["HTTP_PROXY"] = detected_proxy
+                    os.environ["HTTPS_PROXY"] = detected_proxy
+                    os.environ["ALL_PROXY"] = detected_proxy
+                else:
+                    logger.info("No Proxy Configured in Worker (Direct Connection)")
+            except Exception as e:
+                logger.warning(f"Worker failed to detect system proxy: {e}")
 
         logger.info(f"Connecting to Endpoint: {os.environ.get('HF_ENDPOINT', 'Default')}")
 
@@ -390,8 +411,27 @@ def download_worker_entry(
 
     except Exception as e:
         logger.error(f"Worker process failed: {e}")
+        
+        # Check for Gated/Private repo errors (common on mirrors)
+        err_str = str(e)
+        if "401" in err_str or "403" in err_str or "404" in err_str or "GatedRepoError" in err_str:
+            endpoint = os.environ.get('HF_ENDPOINT', '')
+            # If on mirror or generally failed authentication
+            if "hf-mirror" in endpoint or "401" in err_str or "403" in err_str:
+                 official_url = f"https://huggingface.co/{repo_id}"
+                 err_str = (
+                     f"Repository access failed. It might be GATED or PRIVATE.\n"
+                     f"Please visit the official site to accept the license: {official_url}\n"
+                     f"Original Error: {err_str}"
+                 )
+
         progress_queue.put({
             'type': 'error',
             'task_id': task_id,
-            'message': str(e)
+            'message': err_str
         })
+        # We don't raise here because we are in a process entry point, 
+        # raising would just print to stderr and exit. We already sent error to queue.
+    finally:
+        # Cleanup
+        logger.info(f"Worker process for {task_id} exiting.")

@@ -267,7 +267,9 @@ export const en = {
             aria2Title: 'Aria2 Turbo',
             aria2Desc: 'Multi-threaded downloader. Ultra-fast with pause support.',
             validationTitle: 'Environment Check',
-            validationDesc: 'Check if Aria2 is correctly installed'
+            validationDesc: 'Check if Aria2 is correctly installed',
+            autoResume: 'Auto-Resume Incomplete Tasks',
+            autoResumeDesc: 'Example: Automatically resume pending downloads when application starts.'
         },
         cache: {
             path: 'System Cache Path (HF_HOME)',

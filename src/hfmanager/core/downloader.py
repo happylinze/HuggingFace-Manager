@@ -415,7 +415,6 @@ class HFDownloader:
                 try:
                     logger.info(f"Migrating legacy queue: {legacy_file} -> {path}")
                     shutil.copy2(legacy_file, path)
-                    # Optional: Clean up? Let's rename for safety first
                     legacy_file.rename(legacy_file.with_suffix('.bak'))
                 except Exception as e:
                     logger.error(f"Migration failed: {e}")
@@ -426,13 +425,24 @@ class HFDownloader:
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
+            auto_resume = self.config.get('auto_resume_incomplete', False)
+            
             with self._task_lock:
                 for item in data:
-                    # Clean up staled states on load
                     status = DownloadStatus(item.get('status', 'pending'))
+                    
+                    # Logic for resuming
+                    should_start = False
                     if status in (DownloadStatus.DOWNLOADING, DownloadStatus.VERIFYING):
-                        status = DownloadStatus.PAUSED # Reset running to paused
-                        
+                        if auto_resume:
+                            # Keep as DOWNLOADING/PENDING to trigger start
+                            # But we need to reset to PENDING to let start_download handle it?
+                            # Actually, start_download expects PENDING/PAUSED
+                            status = DownloadStatus.PENDING
+                            should_start = True
+                        else:
+                            status = DownloadStatus.PAUSED # Reset running to paused
+
                     task = DownloadTask(
                         id=item['id'],
                         repo_id=item['repo_id'],
@@ -449,12 +459,43 @@ class HFDownloader:
                         downloaded_files=item.get('downloaded_files', 0),
                         result_path=item.get('result_path'),
                         error_message=item.get('error_message'),
-                        pausable=True, # Always true in new architecture
+                        pausable=True,
                         use_hf_transfer=item.get('use_hf_transfer', False)
                     )
                     self._tasks[task.id] = task
+                    
+                    if should_start:
+                        # Schedule start (don't block here)
+                        # We can't call start_download inside lock if it takes lock?
+                        # start_download takes lock. So we must queue it.
+                        pass
+            
+            # Now start tasks outside lock
+            if auto_resume:
+                threading.Thread(target=self._auto_resume_tasks, daemon=True).start()
+                
         except Exception as e:
             logger.error(f"Failed to load queue: {e}")
+
+    def _auto_resume_tasks(self):
+        """Helper to resume tasks after load."""
+        time.sleep(1) # Wait for system to settle
+        keys = []
+        with self._task_lock:
+            # Find tasks that we marked as PENDING from previous DOWNLOADING state
+            # Distinguishing them from user-added PENDING might be hard if we just use PENDING.
+            # But on startup, PENDING usually means "was pending".
+            # Let's just try to start all PENDING tasks? 
+            # Or better, logic in load_queue logic was specifically 'if was DOWNLOADING'.
+            # Re-iterate:
+            for t in self._tasks.values():
+                if t.status == DownloadStatus.PENDING:
+                    keys.append(t.id)
+        
+        logger.info(f"Auto-resuming {len(keys)} tasks...")
+        for k in keys:
+            self.start_download(k)
+
 
     # --- Core Actions ---
 
@@ -798,6 +839,48 @@ class HFDownloader:
                  task = self._tasks[task_id]
              
              # Smart Resume: Check if we have paused GIDs
+             if task_id in self.aria2_gids:
+                 logger.info(f"Resuming existing Aria2 GIDs for {task_id}")
+                 for gid in self.aria2_gids[task_id]:
+                     self.aria2.unpause(gid)
+                 return
+
+             # 1. Fetch Repo Info (File List)
+             logger.info(f"Fetching repo info for {task.repo_id}")
+             
+             # Use generic HfApi to get file list
+             # Allow patterns to filter here to save bandwidth?
+             # No, list_repo_files is metadata only, cheap.
+             try:
+                 repo_info = self.api.repo_info(
+                     repo_id=task.repo_id,
+                     repo_type=task.repo_type,
+                     revision=task.revision,
+                     files_metadata=True
+                 )
+             except Exception as e:
+                 # Check for Gated/Private repo on Mirror
+                 err_str = str(e)
+                 if "401" in err_str or "403" in err_str or "404" in err_str:
+                     # If we are on a mirror, these errors often mean "Gated" or "Private"
+                     # and the mirror can't handle theauth flow or is out of sync.
+                     config = get_config()
+                     mirror = config.get('mirror', 'official')
+                     
+                     if mirror != 'official' or 'hf-mirror' in os.environ.get('HF_ENDPOINT', ''):
+                         official_url = f"https://huggingface.co/{task.repo_id}"
+                         raise Exception(
+                             f"Repository access failed on mirror. It might be GATED or PRIVATE.\n"
+                             f"Please visit the official site to accept the license: {official_url}\n"
+                             f"Original Error: {err_str}"
+                         )
+                 raise e
+
+             siblings = repo_info.siblings # list of RepoSibling
+             
+             # 2. Filter Files
+             from .pattern_matcher import match_patterns
+             # ... rest of the function ...
              existing_gids = self.aria2_gids.get(task_id, [])
              if existing_gids:
                  all_active = True

@@ -93,7 +93,9 @@ async def get_settings(
         "show_trending_tags": downloader.config.get('show_trending_tags', True),
         "show_trending_repos": downloader.config.get('show_trending_repos', True),
         "debug_mode": downloader.config.get('debug_mode', False),
-        "app_data_dir": str(downloader.config.data_dir)
+        "app_data_dir": str(downloader.config.data_dir),
+        "auto_resume_incomplete": downloader.config.get('auto_resume_incomplete', False),
+        "language": downloader.config.get('language', 'en')
     }
 
 @router.put("/", response_model=ActionResponse)
@@ -196,6 +198,17 @@ async def update_settings(
             
         if req.debug_mode is not None:
             downloader.config.set('debug_mode', req.debug_mode)
+            
+        if req.auto_resume_incomplete is not None:
+            downloader.config.set('auto_resume_incomplete', req.auto_resume_incomplete)
+            
+        if req.language is not None:
+             downloader.config.set('language', req.language)
+             # Update Tray if running
+             from ...core.desktop import get_desktop_instance
+             desktop = get_desktop_instance()
+             if desktop:
+                 desktop.set_language(req.language)
         
         # Apply Aria2 dynamic settings if changed
         aria2_updates = {}

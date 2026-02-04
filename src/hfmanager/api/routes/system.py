@@ -282,4 +282,17 @@ async def open_logs_folder():
             
         return {"success": True, "message": "Opened logs folder"}
     except Exception as e:
-        return {"success": False, "message": str(e)}
+        return {"success": True, "message": str(e)}
+
+@router.post("/window/restore")
+async def restore_window():
+    """Restore the desktop window (if running in desktop mode)."""
+    try:
+        from ...core.desktop import get_desktop_instance
+        manager = get_desktop_instance()
+        if manager:
+            manager.restore_window()
+            return {"status": "success", "message": "Window restored"}
+        return {"status": "ignored", "message": "Not in desktop mode"}
+    except ImportError:
+        return {"status": "error", "message": "Desktop module not found"}

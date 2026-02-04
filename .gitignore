@@ -50,3 +50,9 @@ aria2_test_download/
 
 # Debug outputs
 debug_*.txt
+
+# Runtime
+download_queue.json
+app.lock
+*.lock
+data/

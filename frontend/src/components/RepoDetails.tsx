@@ -21,10 +21,11 @@ interface RepoDetailsProps {
     isLocal?: boolean;
     onDownload: (patterns?: string[], revision?: string) => void;
     initialTab?: 'readme' | 'files' | 'manage';
+    onRefresh?: () => void;
 }
 
 
-export function RepoDetails({ isOpen, onClose, repoId, repoType, isLocal = false, onDownload, initialTab = 'readme' }: RepoDetailsProps) {
+export function RepoDetails({ isOpen, onClose, repoId, repoType, isLocal = false, onDownload, initialTab = 'readme', onRefresh }: RepoDetailsProps) {
     const { t } = useLanguage();
     const scrollRef = useRef<HTMLDivElement>(null);
     const { success, error: toastError, info: toastInfo } = useToast();
@@ -735,6 +736,7 @@ export function RepoDetails({ isOpen, onClose, repoId, repoType, isLocal = false
                         isPrivate={info?.private || false}
                         activeSubTab={manageSubTab}
                         onSubTabChange={setManageSubTab}
+                        onRefresh={onRefresh}
                     />
                 )}
             </div>
@@ -821,9 +823,10 @@ interface ManageTabProps {
     isPrivate: boolean;
     activeSubTab: 'upload' | 'metadata' | 'sync' | 'history' | 'space' | 'settings';
     onSubTabChange: (tab: 'upload' | 'metadata' | 'sync' | 'history' | 'space' | 'settings') => void;
+    onRefresh?: () => void;
 }
 
-function ManageTab({ repoId, repoType, isPrivate, activeSubTab, onSubTabChange }: ManageTabProps) {
+function ManageTab({ repoId, repoType, isPrivate, activeSubTab, onSubTabChange, onRefresh }: ManageTabProps) {
     const { t } = useLanguage();
     const { success, error: toastError } = useToast();
     // Sub-tabs state is now controlled by parent
@@ -1247,7 +1250,7 @@ function ManageTab({ repoId, repoType, isPrivate, activeSubTab, onSubTabChange }
                     )}
 
                     {activeSubTab === 'settings' && (
-                        <RepoSettings repoId={repoId} repoType={repoType} initialPrivate={isPrivate} />
+                        <RepoSettings repoId={repoId} repoType={repoType} initialPrivate={isPrivate} onRefresh={onRefresh} />
                     )}
                 </div>
             </div>
@@ -1257,7 +1260,7 @@ function ManageTab({ repoId, repoType, isPrivate, activeSubTab, onSubTabChange }
 
 
 
-function RepoSettings({ repoId, repoType, initialPrivate }: { repoId: string, repoType: string, initialPrivate: boolean }) {
+function RepoSettings({ repoId, repoType, initialPrivate, onRefresh }: { repoId: string, repoType: string, initialPrivate: boolean, onRefresh?: () => void }) {
     const { t } = useLanguage();
     const { success, error: toastError } = useToast();
     const { confirm } = useConfirm();
@@ -1300,8 +1303,9 @@ function RepoSettings({ repoId, repoType, initialPrivate }: { repoId: string, re
                 toRepo = `${user}/${newName}`;
             }
             await moveRepo(repoId, toRepo, repoType);
-            success(t('repoDetails.settings.updateSuccess') + '\nPage will reload.');
-            window.setTimeout(() => window.location.reload(), 1500);
+            success(t('repoDetails.settings.updateSuccess') + '\nPage will refresh.');
+            if (onRefresh) onRefresh();
+            else window.setTimeout(() => window.location.reload(), 1500);
         } catch (e) {
             toastError(String(e));
         } finally {
@@ -1324,7 +1328,8 @@ function RepoSettings({ repoId, repoType, initialPrivate }: { repoId: string, re
                 try {
                     await deleteRepo(repoId, repoType);
                     success(t('repoDetails.settings.deleteSuccess'));
-                    window.setTimeout(() => window.location.reload(), 1500);
+                    if (onRefresh) onRefresh();
+                    else window.setTimeout(() => window.location.reload(), 1500);
                 } catch (e) {
                     toastError(String(e));
                     setLoading(false);

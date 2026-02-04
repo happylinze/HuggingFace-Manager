@@ -134,6 +134,8 @@ export function DownloadSection({ settings, onUpdate, refreshSettings }: Downloa
                         </div>
                     </div>
 
+
+
                     {/* Cache Path */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-[var(--color-text)] flex justify-between">

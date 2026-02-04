@@ -74,7 +74,11 @@ export function CreateRepoModal({ isOpen, onClose, onSuccess, initialType = 'mod
         try {
             const result = await createRepo(formData);
             if (result.success) {
-                if (onSuccess && result.url) onSuccess(result.url);
+                if (onSuccess) {
+                    // Force official URL for browser navigation
+                    const officialUrl = `https://huggingface.co/${formData.repo_type === 'model' ? '' : formData.repo_type === 'dataset' ? 'datasets/' : 'spaces/'}${formData.repo_id}`;
+                    onSuccess(officialUrl);
+                }
                 onClose();
                 // Reset form
                 setFormData({

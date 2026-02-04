@@ -23,6 +23,9 @@ class Config:
         'theme': 'dark',
         'show_hidden_files': False,
         'auto_clean_incomplete': False,
+        'auto_clean_incomplete': False,
+        'auto_resume_incomplete': False, # Auto-resume incomplete tasks on startup
+        'language': 'en', # 'en' or 'zh'
         'hf_cache_dir': '',  # Empty means use System default
         'hf_cache_history': [],  # List of historical cache paths
         'download_dir_history': [], # List of historical download paths

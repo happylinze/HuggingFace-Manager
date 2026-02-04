@@ -107,6 +107,7 @@ export interface Settings {
     show_trending_tags: boolean;
     show_trending_repos: boolean;
     debug_mode: boolean;
+    auto_resume_incomplete?: boolean;
     app_data_dir?: string;
 }
 
@@ -364,6 +365,8 @@ export async function updateSettings(settings: {
     show_trending_tags?: boolean;
     show_trending_repos?: boolean;
     debug_mode?: boolean;
+    auto_resume_incomplete?: boolean;
+    language?: string;
 }): Promise<{ success: boolean; message: string }> {
     const response = await fetch(`${API_BASE}/settings/`, {
         method: 'PUT',
@@ -563,6 +566,15 @@ export async function openPath(path: string): Promise<{ success: boolean; messag
 
 export async function openLogsFolder(): Promise<{ success: boolean; message: string }> {
     const response = await fetch(`${API_BASE}/system/open-logs-folder`, { method: 'POST' });
+    return response.json();
+}
+
+export async function setSystemTheme(isDark: boolean): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE}/system/theme`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_dark: isDark })
+    });
     return response.json();
 }
 

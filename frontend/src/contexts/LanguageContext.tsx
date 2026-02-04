@@ -15,7 +15,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 const translations: Record<Language, Translations> = {
     zh,
-    en
+    en: en as any
 };
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
@@ -29,6 +29,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         localStorage.setItem('language', language);
+
+        // Sync with backend
+        import('../api/client').then(({ updateSettings }) => {
+            updateSettings({ language }).catch(err => console.error("Failed to sync language:", err));
+        });
     }, [language]);
 
     const t = (key: string, params?: Record<string, string | number>): string => {

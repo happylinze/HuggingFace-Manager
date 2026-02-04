@@ -34,6 +34,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             } else {
                 root.classList.remove('dark');
             }
+
+            // Dynamically set Windows Title Bar Theme
+            import('../api/client').then(({ setSystemTheme }) => {
+                setSystemTheme(isDark).catch(err => console.error('Failed to sync window theme:', err));
+            });
         };
 
         applyTheme();

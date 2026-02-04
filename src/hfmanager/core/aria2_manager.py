@@ -4,6 +4,7 @@ import time
 import json
 import logging
 import threading
+import sys
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 import requests
@@ -96,15 +97,25 @@ class Aria2Service:
         min_split = str(config.get('aria2_min_split_size', '1M'))
         check_cert = 'true' if config.get('aria2_check_certificate', False) else 'false'
         proxy = config.get('aria2_all_proxy', '')
-        
-        # Smart Proxy Logic: If using hf-mirror, force direct connection
-        # Check config 'mirror' (default 'hf-mirror') or if URL contains hf-mirror
-        current_mirror = str(config.get('mirror', 'hf-mirror'))
-        if 'hf-mirror' in current_mirror:
-             if proxy:
-                 logger.info("Detected hf-mirror, disabling Aria2 Proxy configuration")
-                 proxy = '' # Force direct
 
+        # Auto-detect System Proxy (e.g. Clash/VPN) if not explicitly set
+        if not proxy:
+            try:
+                from urllib.request import getproxies
+                sys_proxies = getproxies()
+                # Prioritize 'all' > 'https' > 'http'
+                if 'all' in sys_proxies: 
+                    proxy = sys_proxies['all']
+                    logger.info(f"Aria2: Auto-detected System Proxy (all): {proxy}")
+                elif 'https' in sys_proxies and 'https://' in self.rpc_url: # Not strict, just heuristics
+                    proxy = sys_proxies['https']
+                    logger.info(f"Aria2: Auto-detected System Proxy (https): {proxy}")
+                elif 'http' in sys_proxies:
+                    proxy = sys_proxies['http']
+                    logger.info(f"Aria2: Auto-detected System Proxy (http): {proxy}")
+            except Exception as e:
+                logger.warning(f"Failed to detect system proxy: {e}")
+        
         cmd = [
             str(binary),
             "--enable-rpc=true",
@@ -119,7 +130,11 @@ class Aria2Service:
             "--no-conf",
             "--console-log-level=warn",
             f"--check-certificate={check_cert}",
-            f"--reuse-uri={'true' if config.get('aria2_reuse_uri', True) else 'false'}"
+            f"--reuse-uri={'true' if config.get('aria2_reuse_uri', True) else 'false'}",
+            "--connect-timeout=60", # Robust timeout
+            "--timeout=60",
+            "--max-tries=20",       # More retries
+            "--retry-wait=3"        # Wait between retries
         ]
         
         if proxy:
@@ -137,19 +152,31 @@ class Aria2Service:
                 text=True
             )
             
-            # Check for immediate failure
-            try:
-                stdout, stderr = self._process.communicate(timeout=0.5)
-                # If command finishes quickly, it likely failed
-                logger.error(f"Aria2 exited immediately with code {self._process.returncode}")
-                logger.error(f"STDOUT: {stdout}")
-                logger.error(f"STDERR: {stderr}")
-                self._process = None
-                return
-            except subprocess.TimeoutExpired:
-                # Process is running successfully
+            # Robust Wait Loop: Check if process stays alive and port becomes active
+            max_retries = 20 # 2 seconds total (0.1s interval)
+            startup_success = False
+            
+            for _ in range(max_retries):
+                # 1. Check if process died
+                if self._process.poll() is not None:
+                    _, stderr = self._process.communicate()
+                    logger.error(f"Aria2 exited immediately with code {self._process.returncode}")
+                    logger.error(f"STDERR: {stderr}")
+                    self._process = None
+                    return # Startup failed
+                
+                # 2. Check if port is listening (Health Check)
+                try:
+                    requests.get(self.rpc_url, timeout=0.1, proxies={"http": None, "https": None})
+                    startup_success = True
+                    break
+                except:
+                    time.sleep(0.1)
+            
+            if startup_success:
                 logger.info(f"Started Aria2 process with PID {self._process.pid} on port {self.port}")
-                pass
+            else:
+                logger.warning(f"Aria2 process started (PID {self._process.pid}) but port {self.port} not ready.")
                 
         except Exception as e:
             logger.error(f"Failed to start Aria2: {e}")
