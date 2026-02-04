@@ -47,43 +47,43 @@
 <table style="width: 100%; border-collapse: collapse;">
   <tr>
     <td align="center" style="padding: 5px; width: 33.3%;">
-      <img src="./assets/img/search_main.png" alt="Search" style="width: 100%; height: 210px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/search_main.png" alt="Search" style="width: 100%; height: 180px; object-fit: contain; background: #fdfdfd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #eee;" /><br/>
       <sub>🔎 Resource Search</sub>
     </td>
     <td align="center" style="padding: 5px; width: 33.3%;">
-      <img src="./assets/img/download_queue.png" alt="Queue" style="width: 100%; height: 210px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/download_queue.png" alt="Queue" style="width: 100%; height: 180px; object-fit: contain; background: #fdfdfd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #eee;" /><br/>
       <sub>🚀 Download Queue</sub>
     </td>
     <td align="center" style="padding: 5px; width: 33.3%;">
-      <img src="./assets/img/batch_download.png" alt="Filter" style="width: 100%; height: 210px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/batch_download.png" alt="Filter" style="width: 100%; height: 180px; object-fit: contain; background: #fdfdfd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #eee;" /><br/>
       <sub>🔍 Targeted Filtering</sub>
     </td>
   </tr>
   <tr>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/cache_main.png" alt="Cache" style="width: 100%; height: 210px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/cache_main.png" alt="Cache" style="width: 100%; height: 180px; object-fit: contain; background: #fdfdfd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #eee;" /><br/>
       <sub>📊 Cache Statistics</sub>
     </td>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/cache_list.png" alt="Cache List" style="width: 100%; height: 210px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/cache_list.png" alt="Cache List" style="width: 100%; height: 180px; object-fit: contain; background: #fdfdfd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #eee;" /><br/>
       <sub>📃 Cache List</sub>
     </td>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/my_repos.png" alt="Repos" style="width: 100%; height: 210px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/my_repos.png" alt="Repos" style="width: 100%; height: 180px; object-fit: contain; background: #fdfdfd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #eee;" /><br/>
       <sub>📦 Personal Repos</sub>
     </td>
   </tr>
   <tr>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/gguf_quant.png" alt="Quant" style="width: 100%; height: 210px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/gguf_quant.png" alt="Quant" style="width: 100%; height: 180px; object-fit: contain; background: #fdfdfd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #eee;" /><br/>
       <sub>⚙️ GGUF Quantization</sub>
     </td>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/theme_comparison.png" alt="Themes" style="width: 100%; height: 210px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/theme_comparison.png" alt="Themes" style="width: 100%; height: 180px; object-fit: contain; background: #fdfdfd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #eee;" /><br/>
       <sub>🌓 Theme Comparison</sub>
     </td>
     <td align="center" style="padding: 5px;">
-      <img src="./assets/img/settings_main.png" alt="Settings" style="width: 100%; height: 210px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #eee;" /><br/>
+      <img src="./assets/img/settings_main.png" alt="Settings" style="width: 100%; height: 180px; object-fit: contain; background: #fdfdfd; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #eee;" /><br/>
       <sub>🛠️ Global Settings</sub>
     </td>
   </tr>
