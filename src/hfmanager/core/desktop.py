@@ -151,7 +151,10 @@ class DesktopManager:
 
     def _get_tray_menu(self, lang="en"):
         """Get Menu based on language."""
-        if lang == "zh":
+        # Handle variants like zh_CN, zh_TW
+        is_zh = lang.startswith('zh') if lang else False
+        
+        if is_zh:
              return (
                 pystray.MenuItem("打开主界面 (Open)", self.restore_window, default=True),
                 pystray.MenuItem("重启应用 (Restart)", self.restart_app),
@@ -167,13 +170,17 @@ class DesktopManager:
     def set_language(self, lang: str):
         """Update Tray Language."""
         if not self.tray_icon:
+            logger.warning("Tray icon not initialized, cannot set language.")
             return
             
         logger.info(f"Updating Tray Language to {lang}")
-        # Update Menu
-        # According to pystray docs/issues, update_menu might not trigger redraw immediately on all platforms
-        # But setting .menu property usually works for next interaction
-        self.tray_icon.menu = pystray.Menu(*self._get_tray_menu(lang))
+        try:
+            # Update Menu
+            self.tray_icon.menu = pystray.Menu(*self._get_tray_menu(lang))
+            # On some platforms/versions, we might need to tell pystray to refresh?
+            # Actually pystray is quite implicit about this.
+        except Exception as e:
+            logger.error(f"Failed to update tray menu: {e}")
 
     def _run_tray(self):
         """Run System Tray icon."""
@@ -182,6 +189,7 @@ class DesktopManager:
             icon_path = self._get_icon_path()
             if not icon_path or not icon_path.exists():
                 logger.warning("Tray icon not found.")
+                # We can still run without icon on some platforms, but pystray usually needs it
                 return
 
             image = Image.open(icon_path)
@@ -189,45 +197,42 @@ class DesktopManager:
             # Get initial language
             from ..utils.config import get_config
             lang = get_config().get('language', 'en')
+            logger.info(f"Starting Tray Icon with language: {lang}")
 
-            self.tray_icon = pystray.Icon("hfmanager", image, "Hugging Face Manager", self._get_tray_menu(lang))
+            menu = self._get_tray_menu(lang)
+            self.tray_icon = pystray.Icon("hfmanager", image, "Hugging Face Manager", menu)
             self.tray_icon.run()
         except Exception as e:
-            logger.error(f"Tray Error: {e}")
+            logger.error(f"Tray Error: {e}", exc_info=True)
 
-    def restart_app(self):
-        """Restart the application."""
+    def restart_app(self, *args):
+        """Restart the application. *args for pystray callback compatibility."""
         logger.info("Restarting application...")
         
         # Cleanup first
         if self.tray_icon:
-            self.tray_icon.stop()
+            try:
+                self.tray_icon.stop()
+            except:
+                pass
         
         if self.window:
-             self.window.destroy()
+             try:
+                self.window.destroy()
+             except:
+                pass
              
         # Remove lock explicitly just in case atexit doesn't fire on exec
         self._remove_lock()
 
         # Restart
-        # Use sys.executable and original arguments
         import subprocess
-        
-        # If frozen (PyInstaller), sys.executable is the exe
-        # If dev, sys.executable is python.exe
-        
-        # We use Popen to start new and exit current to ensure clean detach?
-        # Or os.execl? os.execl replaces current process.
-        # But GUI frameworks might not like direct replacement if COM/Threads active.
-        # Safer: Start new, then exit.
-        
         try:
             cmd = [sys.executable] + sys.argv[1:]
             subprocess.Popen(cmd)
-            sys.exit(0)
+            os._exit(0) # Cleaner exit for GUI apps sometimes than sys.exit
         except Exception as e:
             logger.error(f"Failed to restart: {e}")
-            # Fallback to hard exit
             sys.exit(1)
 
     def _get_icon_path(self) -> Path:
@@ -279,84 +284,18 @@ class DesktopManager:
         self.window.hide()
         return False
 
-    def restore_window(self):
-        """Restore and focus the window."""
+    def restore_window(self, *args):
+        """Restore and focus the window. *args for pystray callback compatibility."""
         if self.window:
-            # webview methods are thread-safe usually? 
-            # It's better to verify doc, but typically yes or queues it.
-            self.window.restore()
-            self.window.show()
-            self.window.focus()
+            try:
+                # pywebview methods should be called from main thread or are thread-safe 
+                # depending on the GUI loop. For WinForms/EdgeChromium, usually thread-safe.
+                self.window.restore()
+                self.window.show()
+                self.window.focus()
+            except Exception as e:
+                logger.error(f"Failed to restore window: {e}")
             
-    def set_window_theme(self, is_dark: bool):
-        """Set Windows Title Bar Theme (Dark/Light)."""
-        if os.name != 'nt' or not self.window:
-            return
-
-        try:
-            import ctypes
-            from ctypes import c_int, byref
-            
-            # Constants
-            DWMWA_USE_IMMERSIVE_DARK_MODE = 20
-            # For older Win10 builds (1903-), attribute was 19
-            # But let's assume modern Windows 10/11
-            
-            hwnd = self.window.uid # pywebview stores HWND in uid for Windows? 
-            # Actually pywebview 5.x: window.uid might be a string ID.
-            # We need the actual HWND.
-            # pywebview doesn't easily expose HWND in all backends, 
-            # In 'edgechromium' (Windows default), we might need to find it by title or assume active?
-            # Wait, pywebview's window object might have handle in .gui object?
-            # Let's try to find window by title as fallback if we can't get handle directly
-            
-            # Search logic
-            target_hwnd = 0
-            
-            # Simple approach: Pywebview's native handle access depends on renderer.
-            # Let's try to find by title since we know it
-            def find_window_callback(h, ctx):
-                length = ctypes.windll.user32.GetWindowTextLengthW(h)
-                buff = ctypes.create_unicode_buffer(length + 1)
-                ctypes.windll.user32.GetWindowTextW(h, buff, length + 1)
-                if "Hugging Face Manager" in buff.value:
-                    ctx.append(h)
-                return True
-                
-            EnumWindows = ctypes.windll.user32.EnumWindows
-            EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.py_object)
-            
-            handles = []
-            EnumWindows(EnumWindowsProc(find_window_callback), handles)
-            
-            if handles:
-                # Pick the one that belongs to our PID?
-                my_pid = os.getpid()
-                for h in handles:
-                    pid = ctypes.c_ulong()
-                    ctypes.windll.user32.GetWindowThreadProcessId(h, byref(pid))
-                    if pid.value == my_pid:
-                        target_hwnd = h
-                        break
-            
-            if target_hwnd:
-                value = c_int(1 if is_dark else 0)
-                ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                    target_hwnd, 
-                    DWMWA_USE_IMMERSIVE_DARK_MODE, 
-                    byref(value), 
-                    ctypes.sizeof(value)
-                )
-                
-                # Force redraw
-                ctypes.windll.user32.SetWindowPos(target_hwnd, 0, 0, 0, 0, 0, 0x0027) # SWP_FRAMECHANGED | ...
-                logger.info(f"Set Window Theme to {'Dark' if is_dark else 'Light'}")
-            else:
-                logger.warning("Could not find window handle to set theme.")
-                
-        except Exception as e:
-            logger.error(f"Failed to set window theme: {e}")
-
     def set_window_theme(self, is_dark: bool):
         """Set Windows Title Bar Theme (Dark/Light)."""
         if os.name != 'nt' or not self.window:
@@ -413,40 +352,35 @@ class DesktopManager:
         except Exception as e:
             logger.error(f"Failed to set window theme: {e}")
 
-    def quit_app(self):
-        """Exit the application completely."""
+    def quit_app(self, *args):
+        """Exit the application completely. *args for pystray callback compatibility."""
         self.should_exit = True
+        logger.info("Quitting application...")
         
         # Stop Tray
         if self.tray_icon:
-            self.tray_icon.stop()
+            try:
+                self.tray_icon.stop()
+            except:
+                pass
             
         # Destroy Window
         if self.window:
-            self.window.destroy()
-            
-        # Kill Server? It's daemon, will die with main thread.
-        # Release lock handled by atexit.
-        
-        # Stop Aria2 (Critical: prevent zombie process)
-        try:
-            from hfmanager.api.dependencies import get_downloader
-            downloader = get_downloader()
-            # Assuming downloader has access to aria2_service or we get it directly
-            # Better to get service directly to avoid circular imports? 
-            # Dependencies might be tricky inside desktop.py
-            # Let's try raw shutdown if possible
-            pass
-        except:
-            pass
+            try:
+                self.window.destroy()
+            except:
+                pass
             
         # Harder kill for Aria2: use taskkill/pkill as fallback
-        if os.name == 'nt':
-            os.system("taskkill /F /IM aria2c.exe /T >nul 2>&1")
-        else:
-            os.system("pkill -f aria2c >/dev/null 2>&1")
+        try:
+            if os.name == 'nt':
+                os.system("taskkill /F /IM aria2c.exe /T >nul 2>&1")
+            else:
+                os.system("pkill -f aria2c >/dev/null 2>&1")
+        except:
+            pass
 
-        sys.exit(0)
+        os._exit(0)
 
 # Global Instance
 desktop_instance: Optional[DesktopManager] = None

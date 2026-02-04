@@ -204,11 +204,15 @@ async def update_settings(
             
         if req.language is not None:
              downloader.config.set('language', req.language)
+             from ...utils.logger import logger as root_logger
+             root_logger.info(f"API: Changing language to {req.language}")
              # Update Tray if running
              from ...core.desktop import get_desktop_instance
              desktop = get_desktop_instance()
              if desktop:
                  desktop.set_language(req.language)
+             else:
+                 root_logger.warning("API: Desktop instance not found, tray not updated.")
         
         # Apply Aria2 dynamic settings if changed
         aria2_updates = {}
