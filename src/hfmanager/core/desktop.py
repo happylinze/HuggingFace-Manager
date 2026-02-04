@@ -373,10 +373,15 @@ class DesktopManager:
             
         # Harder kill for Aria2: use taskkill/pkill as fallback
         try:
+            import subprocess
             if os.name == 'nt':
-                os.system("taskkill /F /IM aria2c.exe /T >nul 2>&1")
+                # CREATE_NO_WINDOW = 0x08000000
+                subprocess.run(['taskkill', '/F', '/IM', 'aria2c.exe', '/T'], 
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             creationflags=0x08000000)
             else:
-                os.system("pkill -f aria2c >/dev/null 2>&1")
+                subprocess.run(['pkill', '-f', 'aria2c'], 
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except:
             pass
 

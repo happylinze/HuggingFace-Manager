@@ -30,7 +30,8 @@ class Aria2Service:
             try:
                 # Use taskkill to kill all aria2c.exe processes
                 subprocess.run(['taskkill', '/F', '/IM', 'aria2c.exe', '/T'], 
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             creationflags=0x08000000)
                 logger.info("Cleaned up existing aria2c.exe processes")
                 time.sleep(0.5) # Give OS time to release ports
             except Exception as e:
