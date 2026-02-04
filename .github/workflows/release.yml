@@ -58,19 +58,22 @@ jobs:
           if (-not (Test-Path "src/hfmanager/resources/bin")) {
             mkdir "src/hfmanager/resources/bin"
           }
+          # 检查本地是否有，没有则通过 choco 安装
           if (-not (Test-Path "src/hfmanager/resources/bin/aria2c.exe")) {
-            echo "aria2c.exe not found in repo, installing via Chocolatey..."
-            choco install aria2 --no-progress
-            Copy-Item "C:\ProgramData\chocolatey\bin\aria2c.exe" -Destination "src/hfmanager/resources/bin/aria2c.exe"
-          } else {
-            echo "Using bundled aria2c.exe"
+            if (-not (Get-Command "aria2c" -ErrorAction SilentlyContinue)) {
+               choco install aria2 --no-progress
+            }
+            $aria2Exe = (Get-Command "aria2c").Source
+            Copy-Item "$aria2Exe" -Destination "src/hfmanager/resources/bin/aria2c.exe"
           }
 
       - name: Setup Aria2 (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y aria2
+          if ! command -v aria2c &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y aria2
+          fi
           mkdir -p src/hfmanager/resources/bin
           cp $(which aria2c) src/hfmanager/resources/bin/aria2c
           rm -f src/hfmanager/resources/bin/aria2c.exe
@@ -78,9 +81,12 @@ jobs:
       - name: Setup Aria2 (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          brew install aria2 || echo "aria2 already installed or brew failed, continuing..."
+          if ! command -v aria2c &> /dev/null; then
+            brew install aria2
+          fi
           mkdir -p src/hfmanager/resources/bin
           cp $(which aria2c) src/hfmanager/resources/bin/aria2c
+          chmod +x src/hfmanager/resources/bin/aria2c
           rm -f src/hfmanager/resources/bin/aria2c.exe
 
       - name: Build with PyInstaller
