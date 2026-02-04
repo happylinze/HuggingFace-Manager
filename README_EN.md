@@ -94,7 +94,7 @@
 ## 📥 Download & Run
 
 ### Pre-built Versions (Recommended)
-Download the version for your platform directly from [Releases](https://github.com/happylinze/HuggingFace-Manager/releases), and double-click to run.
+Download the version for your platform directly from [Latest Release](https://github.com/happylinze/HuggingFace-Manager/releases/latest), and double-click to run.
 
 ### Run from Source
 ```bash

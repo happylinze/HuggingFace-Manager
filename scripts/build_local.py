@@ -53,12 +53,41 @@ def kill_running_process(process_name):
             time.sleep(2)
 
 
+def get_version(project_root):
+    """Read version from pyproject.toml."""
+    try:
+        import tomllib # Python 3.11+
+    except ImportError:
+        try:
+            import tomli as tomllib # Fallback
+        except ImportError:
+            # Simple regex fallback if no toml parser
+            import re
+            toml_path = project_root / "pyproject.toml"
+            if toml_path.exists():
+                with open(toml_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    match = re.search(r'version\s*=\s*"([^"]+)"', content)
+                    if match:
+                        return match.group(1)
+            return "unknown"
+
+    toml_path = project_root / "pyproject.toml"
+    if toml_path.exists():
+        with open(toml_path, "rb") as f:
+            data = tomllib.load(f)
+            return data.get("project", {}).get("version", "unknown")
+    return "unknown"
+
 def main():
     # 1. Setup Paths
     project_root = Path(__file__).parent.parent.absolute()
     frontend_dir = project_root / "frontend"
     dist_dir = project_root / "dist"
     
+    version = get_version(project_root)
+    print(f"📌 Project Version: {version}")
+
     # 2. Build Frontend
     print("\n📦 Building Frontend...")
     if not (frontend_dir / "node_modules").exists():
@@ -97,19 +126,32 @@ def main():
 
     # 4. Build Backend (PyInstaller)
     print("\n🐍 Building Backend with PyInstaller...")
-    # Ensure aria2 binary exists in resources (Mock check)
+    # Ensure aria2 binary exists in resources
     aria2_res = project_root / "src" / "hfmanager" / "resources" / "bin"
     aria2_res.mkdir(parents=True, exist_ok=True)
     
-    # Note: User is responsible for putting aria2c.exe there if they want it bundled,
-    # or the script could download it. GitHub Actions does downloads.
-    # For local dev, we assume the user has set it up or it's empty (app will use specific path logic).
-    
     run_command("pyinstaller hfmanager.spec", cwd=project_root)
     
+    # 5. Packaging (Zip)
+    print("\n🗜️ Packaging Application...")
+    output_name = f"HFManager_v{version}_Win_x64"
+    app_dist = dist_dir / "HFManager"
+    zip_path = dist_dir / output_name
+    
+    if app_dist.exists():
+        try:
+            # shutil.make_archive adds .zip extension automatically
+            zip_file = shutil.make_archive(str(zip_path), 'zip', app_dist)
+            print(f"🎁 Created Zip: {zip_file}")
+        except Exception as e:
+            print(f"❌ Failed to create zip: {e}")
+    else:
+        print("❌ App dist not found, skipping zip.")
+
     print("\n✅ Build Complete!")
-    print(f"📂 Output: {dist_dir / 'HFManager'}")
-    print("👉 You can now run the executable inside 'dist/HFManager'")
+    print(f"📂 Output Folder: {app_dist}")
+    print(f"📦 Release Package: {zip_path}.zip")
+    print(f"👉 You can now run the executable inside 'dist/HFManager' or share the ZIP.")
 
 if __name__ == "__main__":
     main()

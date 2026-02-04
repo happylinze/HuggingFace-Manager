@@ -94,7 +94,7 @@
 ## 📥 下载与运行
 
 ### 预构建版本 (推荐)
-直接 from [Releases](https://github.com/happylinze/HuggingFace-Manager/releases) 下载对应平台的版本，双击运行即可。
+直接从 [Latest Release](https://github.com/happylinze/HuggingFace-Manager/releases/latest) 下载对应平台的版本，双击运行即可。
 
 ### 从源码运行
 ```bash
