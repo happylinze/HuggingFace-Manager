@@ -52,12 +52,20 @@ class Aria2Service:
         
         # 1. Handle Frozen Environment (PyInstaller)
         if getattr(sys, 'frozen', False):
-            # In one-file mode, sys._MEIPASS is the temp folder
-            # We bundled it to 'hfmanager/resources' in build.spec
-            base_path = Path(sys._MEIPASS)
+            # Handle Frozen Environment (PyInstaller)
+            if hasattr(sys, '_MEIPASS'):
+                 # Onefile mode
+                 base_path = Path(sys._MEIPASS)
+            else:
+                 # Onedir mode (folder)
+                 base_path = Path(sys.executable).parent
+            
             bin_path = base_path / "hfmanager" / "resources" / "bin" / binary_name
             if bin_path.exists():
+                logger.info(f"Found bundled aria2 at: {bin_path}")
                 return bin_path
+            else:
+                logger.warning(f"Bundled aria2 NOT found at: {bin_path}")
                 
         # 2. Check resources/bin relative to this file (Dev Mode)
         current_dir = Path(__file__).parent.parent 
