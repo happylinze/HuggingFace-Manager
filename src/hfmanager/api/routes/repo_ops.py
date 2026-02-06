@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from ...core.cache_manager import CacheManager
-from ..dependencies import get_cache_manager
+from ..dependencies import get_cache_manager, get_downloader
 from ...core.auth_manager import get_auth_manager
 from ...api.models.repository import RepoActionResponse, UpdateMetadataRequest, UpdateVisibilityRequest, MoveRepoRequest
 from huggingface_hub import RepoCard, HfApi

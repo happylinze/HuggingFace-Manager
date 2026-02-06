@@ -3,6 +3,7 @@ from typing import List, Optional, Dict
 from pydantic import BaseModel
 from ...core.auth_manager import get_auth_manager
 from ...core.mirror_manager import get_mirror_manager
+from ..dependencies import get_downloader
 from huggingface_hub import HfApi
 
 router = APIRouter(prefix="/git", tags=["GitOps"])

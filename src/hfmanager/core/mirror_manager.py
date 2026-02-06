@@ -217,8 +217,7 @@ class MirrorManager:
             Dictionary with 'success', 'latency_ms', 'error' keys.
         """
         import time
-        import urllib.request
-        import urllib.error
+        import requests
         
         if mirror_key not in self.MIRRORS:
             return {'success': False, 'error': 'Mirror not found'}
@@ -226,20 +225,38 @@ class MirrorManager:
         mirror = self.MIRRORS[mirror_key]
         test_url = f"{mirror.url}/api/models"
         
+        # Configure Request
+        verify = True
+        if mirror_key != 'official':
+            verify = False
+            
+        proxies = self.config.get_proxy_dict()
+
         try:
             start_time = time.time()
-            req = urllib.request.Request(test_url, method='HEAD')
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                latency = (time.time() - start_time) * 1000
-                return {
-                    'success': response.status == 200,
-                    'latency_ms': round(latency, 2),
-                    'status': response.status
-                }
-        except urllib.error.URLError as e:
-            return {'success': False, 'error': str(e.reason)}
-        except Exception as e:
+            # Use requests for better proxy and SSL handling
+            response = requests.head(
+                test_url, 
+                timeout=timeout, 
+                verify=verify, 
+                proxies=proxies,
+                headers={"User-Agent": "HFManager/1.0"}
+            )
+            
+            latency = (time.time() - start_time) * 1000
+            
+            # Check success (200 OK)
+            success = response.status_code == 200
+            
+            return {
+                'success': success,
+                'latency_ms': round(latency, 2),
+                'status': response.status_code
+            }
+        except requests.exceptions.RequestException as e:
             return {'success': False, 'error': str(e)}
+        except Exception as e:
+            return {'success': False, 'error': f"Unexpected: {str(e)}"}
 
 
 # Global instance

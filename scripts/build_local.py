@@ -90,12 +90,23 @@ def main():
 
     # 2. Build Frontend
     print("\n📦 Building Frontend...")
-    if not (frontend_dir / "node_modules").exists():
-        run_command("npm install", cwd=frontend_dir)
-    run_command("npm run build", cwd=frontend_dir)
+    frontend_dist = frontend_dir / "dist" / "index.html"
     
+    try:
+        if not (frontend_dir / "node_modules").exists():
+            # Use subprocess directly to catch the error (run_command exits on fail)
+            subprocess.run("npm install", cwd=frontend_dir, shell=True, check=True)
+        subprocess.run("npm run build", cwd=frontend_dir, shell=True, check=True)
+    except Exception as e:
+        print(f"⚠️ Frontend build command failed: {e}")
+        if frontend_dist.exists():
+            print("✅ Found existing frontend build. Continuing...")
+        else:
+            print("❌ Frontend build failed and no existing dist found!")
+            sys.exit(1)
+            
     # Verify Frontend Build
-    if not (frontend_dir / "dist" / "index.html").exists():
+    if not frontend_dist.exists():
         print("❌ Frontend build failed: index.html not found!")
         sys.exit(1)
         

@@ -1,3 +1,4 @@
+"""
 CLI Handler for Hugging Face Manager.
 Provides logic for terminal-based search, download, and cache management.
 """
@@ -16,6 +17,10 @@ from ..utils.config import get_config
 def run_search(query: str, repo_type: str = "model", limit: int = 10):
     """Search HF and print results to terminal."""
     print(f"\n🔍 Searching for '{query}' in {repo_type}s...")
+    
+    # Apply proxy env vars globally
+    config = get_config()
+    config.apply_env_proxy()
     
     api = HfApi()
     try:

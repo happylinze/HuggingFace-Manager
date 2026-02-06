@@ -35,7 +35,7 @@ from .dependencies import get_downloader, get_mirror_manager
 app = FastAPI(
     title="HFManager API",
     description="Backend API for HFManager Desktop (Tauri Hybrid)",
-    version="0.1.0"
+    version="0.1.1"
 )
 
 # Enable CORS for Tauri frontend

@@ -133,15 +133,19 @@ def _fetch_avatar(author: str, hf_endpoint: str) -> Optional[str]:
     if not author or author.lower() in ["none", "unknown"]:
         return None
     
+    from ...utils.config import get_config
+    proxies = get_config().get_proxy_dict()
+    headers = {"User-Agent": "HFManager/1.0"}
+
     try:
         # Try User API first
         url = f"{hf_endpoint}/api/users/{author}/overview"
-        response = requests.get(url, timeout=2, verify=False)
+        response = requests.get(url, timeout=3, verify=False, proxies=proxies, headers=headers)
         
         if response.status_code == 404:
             # Fallback to Organization API
             url = f"{hf_endpoint}/api/organizations/{author}/overview"
-            response = requests.get(url, timeout=2, verify=False)
+            response = requests.get(url, timeout=3, verify=False, proxies=proxies, headers=headers)
             
         if response.status_code == 200:
             data = response.json()
@@ -417,7 +421,7 @@ def get_info(repo_id: str, repo_type: str = "model", downloader: HFDownloader = 
          raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/tree/{repo_id:path}", response_model=RepoTreeResponse)
-async def get_tree(
+def get_tree(
     repo_id: str, 
     repo_type: str = "model",
     revision: str = "main",

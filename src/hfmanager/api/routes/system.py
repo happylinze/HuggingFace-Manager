@@ -214,7 +214,7 @@ async def check_update():
         if resp.status_code == 200:
             data = resp.json()
             latest_version = data.get("tag_name", "0.0.0").lstrip("v")
-            current_version = "0.1.0" # TODO: get from PACKAGE_VERSION or similar
+            current_version = "0.1.1" # TODO: get from PACKAGE_VERSION or similar
             
             # Simple version compare
             has_update = latest_version > current_version
@@ -231,8 +231,8 @@ async def check_update():
         
     return {
         "has_update": False,
-        "current_version": "0.1.0",
-        "latest_version": "0.1.0",
+        "current_version": "0.1.1",
+        "latest_version": "0.1.1",
         "release_notes": "Could not check for updates."
     }
 

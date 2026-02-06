@@ -23,7 +23,7 @@ logger = logging.getLogger("hfmanager-server")
 app = FastAPI(
     title="HFManager API",
     description="Backend API for Hugging Face model and dataset management",
-    version="0.1.0"
+    version="0.1.1"
 )
 
 # Initialize mirror settings on startup

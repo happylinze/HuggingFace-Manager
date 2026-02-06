@@ -40,13 +40,14 @@ try:
         logger.info("[Pre-init] Using Official Endpoint")
         
     # 2. Apply Proxy
+    # 2. Apply Proxy Global Env
     config = get_config()
+    config.apply_env_proxy()
     proxy_url = config.get('proxy_url')
     if proxy_url:
         logger.info(f"[Pre-init] Applying Proxy Configuration -> {proxy_url}")
-        os.environ['HTTP_PROXY'] = proxy_url
-        os.environ['HTTPS_PROXY'] = proxy_url
-        os.environ['ALL_PROXY'] = proxy_url
+    else:
+        logger.info("[Pre-init] Using Direct Connection (System Proxy Bypassed)")
 except Exception as e:
     logger.warning(f"Failed to apply mirror settings early: {e}")
 # -----------------------------------------------------------------------

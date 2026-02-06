@@ -102,7 +102,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.statusbar)
         
         # Version info
-        version_label = QLabel("v0.1.0")
+        version_label = QLabel("v0.1.1")
         self.statusbar.addPermanentWidget(version_label)
         
         # Initial status

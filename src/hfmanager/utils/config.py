@@ -114,6 +114,39 @@ class Config:
         self._save()
 
 
+    def apply_env_proxy(self):
+        """Apply proxy settings to environment variables."""
+        import os
+        proxy_url = self.get('proxy_url')
+        if proxy_url:
+            os.environ["HTTP_PROXY"] = proxy_url
+            os.environ["HTTPS_PROXY"] = proxy_url
+            os.environ["ALL_PROXY"] = proxy_url
+            os.environ.pop("NO_PROXY", None)  # Remove bypass if proxy set
+        else:
+            # FORCE Direct connection by setting NO_PROXY
+            os.environ.pop("HTTP_PROXY", None)
+            os.environ.pop("HTTPS_PROXY", None)
+            os.environ.pop("ALL_PROXY", None)
+            os.environ["NO_PROXY"] = "*"
+
+    def get_proxy_dict(self) -> Optional[dict]:
+        """Get a proxy dictionary compatible with requests."""
+        proxy_url = self.get('proxy_url')
+        if proxy_url:
+            return {
+                "http": proxy_url,
+                "https": proxy_url,
+                "all": proxy_url
+            }
+        # Return explicit None dict to FORCE direct connection and ignore System Proxy
+        # This solves issues where Windows System Proxy is broken or incompatible with requests
+        return {
+            "http": None,
+            "https": None,
+            "all": None
+        }
+
 # Global config instance
 _config: Optional[Config] = None
 

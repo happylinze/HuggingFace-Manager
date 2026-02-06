@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from ...core.auth_manager import get_auth_manager
+from ..dependencies import get_downloader
 from huggingface_hub import HfApi
 
 router = APIRouter(prefix="/spaces", tags=["SpaceOps"])

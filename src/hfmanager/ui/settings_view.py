@@ -284,7 +284,7 @@ class SettingsView(QWidget):
         about_layout = QVBoxLayout(about_group)
         
         about_text = QLabel(
-            "<b>HFManager</b> v0.1.0<br><br>"
+            "<b>HFManager</b> v0.1.1<br><br>"
             "一个简单易用的 Hugging Face 模型下载与缓存管理工具。<br><br>"
             "功能特性:<br>"
             "• 缓存可视化管理<br>"

@@ -53,23 +53,14 @@ def download_worker_entry(
         if endpoint:
             os.environ["HF_ENDPOINT"] = endpoint
 
-        # Smart Proxy Logic: If using hf-mirror, force direct connection
-        # This fixes issues where system proxy (e.g. from Clash) is left on but dead, or slow for domestic mirror
-        if (endpoint and "hf-mirror.com" in endpoint) or (os.environ.get("HF_ENDPOINT") and "hf-mirror.com" in os.environ.get("HF_ENDPOINT")):
-            logger.info(f"Detected hf-mirror, forcing DIRECT connection (Bypassing Proxy settings)")
-            # 1. Ignore configured proxy
-            proxy_url = None
-            # 2. Clear System Proxy Env Vars to prevent auto-detection
-            os.environ.pop("HTTP_PROXY", None)
-            os.environ.pop("HTTPS_PROXY", None)
-            os.environ.pop("ALL_PROXY", None)
-
         if proxy_url:
             os.environ["HTTP_PROXY"] = proxy_url
             os.environ["HTTPS_PROXY"] = proxy_url
             os.environ["ALL_PROXY"] = proxy_url
             logger.info(f"Proxy Configured in Worker: {proxy_url}")
         else:
+            # Check for hf-mirror specific bypass if requested (though we keep it simple for now)
+            # Re-detecting system proxy is good for process isolation safety
             # Auto-detect System Proxy if not explicit
             try:
                 from urllib.request import getproxies

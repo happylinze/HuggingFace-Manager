@@ -135,15 +135,7 @@ async def update_settings(
         
         if req.proxy_url is not None:
             downloader.config.set('proxy_url', req.proxy_url)
-            import os
-            if req.proxy_url:
-                os.environ['HTTP_PROXY'] = req.proxy_url
-                os.environ['HTTPS_PROXY'] = req.proxy_url
-                os.environ['ALL_PROXY'] = req.proxy_url
-            else:
-                 os.environ.pop('HTTP_PROXY', None)
-                 os.environ.pop('HTTPS_PROXY', None)
-                 os.environ.pop('ALL_PROXY', None)
+            downloader.config.apply_env_proxy()
             should_refresh_api = True
             
         if req.hf_cache_dir is not None:  # Allow empty string
@@ -253,7 +245,7 @@ async def update_settings(
 from ..models.settings import ValidateTokenRequest
 
 @router.post("/validate-token")
-async def validate_token(
+def validate_token(
     req: ValidateTokenRequest,
     auth_mgr: AuthManager = Depends(get_auth_manager)
 ):

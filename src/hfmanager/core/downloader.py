@@ -148,7 +148,11 @@ class HFDownloader:
         
     def refresh_api(self):
         """Re-initialize API client."""
+        # Ensure env vars are fresh
+        self.config.apply_env_proxy()
+        
         endpoint = os.environ.get('HF_ENDPOINT')
+        # HfApi reads environment variables (HTTP_PROXY/NO_PROXY) automatically
         self.api = self.api_cls(endpoint=endpoint) if endpoint else self.api_cls()
 
     def _monitor_queue_loop(self):
@@ -833,6 +837,8 @@ class HFDownloader:
     def _dispatch_aria2_task(self, task_id: str):
         """Dispatch task to Aria2."""
         from huggingface_hub import hf_hub_url
+        import fnmatch
+        
         try:
              with self._task_lock:
                  if task_id not in self._tasks: return
@@ -840,49 +846,8 @@ class HFDownloader:
              
              # Smart Resume: Check if we have paused GIDs
              if task_id in self.aria2_gids:
-                 logger.info(f"Resuming existing Aria2 GIDs for {task_id}")
-                 for gid in self.aria2_gids[task_id]:
-                     self.aria2.unpause(gid)
-                 return
-
-             # 1. Fetch Repo Info (File List)
-             logger.info(f"Fetching repo info for {task.repo_id}")
-             
-             # Use generic HfApi to get file list
-             # Allow patterns to filter here to save bandwidth?
-             # No, list_repo_files is metadata only, cheap.
-             try:
-                 repo_info = self.api.repo_info(
-                     repo_id=task.repo_id,
-                     repo_type=task.repo_type,
-                     revision=task.revision,
-                     files_metadata=True
-                 )
-             except Exception as e:
-                 # Check for Gated/Private repo on Mirror
-                 err_str = str(e)
-                 if "401" in err_str or "403" in err_str or "404" in err_str:
-                     # If we are on a mirror, these errors often mean "Gated" or "Private"
-                     # and the mirror can't handle theauth flow or is out of sync.
-                     config = get_config()
-                     mirror = config.get('mirror', 'official')
-                     
-                     if mirror != 'official' or 'hf-mirror' in os.environ.get('HF_ENDPOINT', ''):
-                         official_url = f"https://huggingface.co/{task.repo_id}"
-                         raise Exception(
-                             f"Repository access failed on mirror. It might be GATED or PRIVATE.\n"
-                             f"Please visit the official site to accept the license: {official_url}\n"
-                             f"Original Error: {err_str}"
-                         )
-                 raise e
-
-             siblings = repo_info.siblings # list of RepoSibling
-             
-             # 2. Filter Files
-             from .pattern_matcher import match_patterns
-             # ... rest of the function ...
-             existing_gids = self.aria2_gids.get(task_id, [])
-             if existing_gids:
+                 existing_gids = self.aria2_gids[task_id]
+                 # Valid GIDs?
                  all_active = True
                  resumed_any = False
                  for gid in existing_gids:
@@ -894,93 +859,85 @@ class HFDownloader:
                          elif s['status'] in ('active', 'waiting'):
                              resumed_any = True
                          else:
-                             all_active = False # Failed/Complete/Removed
+                             all_active = False
                      except Exception:
                          all_active = False
                  
-                 # If we successfully resumed valid tasks, we don't need to re-dispatch
-                 if resumed_any and all_active:
+                 if resumed_any:
                      logger.info(f"Resumed existing Aria2 GIDs for {task_id}")
-                     # Ensure monitor loop is running? (Monitor loop dies on finish/error, but maybe not on pause?)
-                     # Monitor loop checks "if task_id not in tasks: break".
-                     # We should restart monitor loop just in case it died?
-                     # No, monitor loop usually dies on Exception or Stop.
-                     # Let's ensure monitor loop is running.
-                     # But we can't easily check if thread is alive for specific task unless we store thread handle.
-                     # Duplicate monitor loops are bad.
-                     # Let's assume monitor loop handles itself or we start a new one?
-                     # Safest: Start new monitor loop, rely on lock/GIDs.
-                     # But multiple loops polling same GIDs is weird but okay-ish if read-only.
-                     # However, monitor updates task.
-                     # Let's enforce single monitor later. For now, just resume logic.
-                     # Actually, if monitor loop died, we need a new one.
-                     # If it's still running (waiting loop?), it's fine.
-                     # My monitor loop has `while True`. If `PAUSED`, it sleeps.
-                     # So it should be alive!
-                     return 
+                     # Ensure monitor is running
+                     threading.Thread(target=self._monitor_aria2_task, args=(task_id, existing_gids), daemon=True).start()
+                     return
 
-             # Determine result path (Cache or Local)
-             if task.local_dir:
-                 # Standard HF Structure: download_dir/models--owner--name
-                 prefix = "models"
-                 if task.repo_type == "dataset": prefix = "datasets"
-                 elif task.repo_type == "space": prefix = "spaces"
-                 repo_subdir = f"{prefix}--{task.repo_id.replace('/', '--')}"
-                 task.result_path = str(Path(task.local_dir) / repo_subdir)
-             else:
-                 # Standard HF Cache Layout
-                 # cache_dir/models--owner--name/snapshots/revision
-                 cache_root = Path(os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface/hub")))
-                 repo_dir = f"{task.repo_type}s--{task.repo_id.replace('/', '--')}"
-                 snapshot_dir = cache_root / repo_dir / "snapshots" / task.revision
-                 task.result_path = str(snapshot_dir)
-
-             # Resolve URLs (This blocks, running in thread)
+             # 1. Fetch Repo Info (File List)
+             logger.info(f"Fetching repo info for {task.repo_id}")
              try:
-                 repo_info = self.api.repo_info(repo_id=task.repo_id, revision=task.revision, files_metadata=True)
+                 repo_info = self.api.repo_info(
+                     repo_id=task.repo_id,
+                     repo_type=task.repo_type,
+                     revision=task.revision,
+                     files_metadata=True
+                 )
              except Exception as e:
-                 raise Exception(f"Failed to fetch repo info: {e}")
+                 # Check for Gated/Private repo on Mirror
+                 err_str = str(e)
+                 if "401" in err_str or "403" in err_str or "404" in err_str:
+                     config = get_config()
+                     mirror = config.get('mirror', 'official')
+                     if mirror != 'official' or 'hf-mirror' in os.environ.get('HF_ENDPOINT', ''):
+                         official_url = f"https://huggingface.co/{task.repo_id}"
+                         raise Exception(
+                             f"Repository access failed on mirror. It might be GATED or PRIVATE.\n"
+                             f"Please visit the official site to accept the license: {official_url}\n"
+                             f"Original Error: {err_str}"
+                         )
+                 raise e
 
+             # 2. Filter Files
+             from .pattern_matcher import match_patterns
              files_to_download = []
-             import fnmatch
              total_size = 0
              total_files = 0
              
              for f in repo_info.siblings:
-                 if not f.size: continue 
+                 if not f.size: continue # Skip directories/empty files
                  
-                 # Filtering
-                 if task.include_patterns:
-                     if not any(fnmatch.fnmatch(f.rfilename, p) for p in task.include_patterns): continue
-                 if task.exclude_patterns:
-                     if any(fnmatch.fnmatch(f.rfilename, p) for p in task.exclude_patterns): continue
-                     
-                 files_to_download.append(f)
-                 total_size += f.size
-                 total_files += 1
-            
+                 if match_patterns(f.rfilename, task.include_patterns, task.exclude_patterns):
+                    files_to_download.append(f)
+                    total_size += f.size
+                    total_files += 1
+
              with self._task_lock:
                  task.total_size = total_size
                  task.total_files = total_files
                  self._notify_callbacks(task)
              
-             # Determine save dir
+             # 3. Determine save dir
              if task.local_dir:
                  download_dir = Path(task.local_dir)
-                 # Adjust structure
+                 # Structure: local_dir / models--user--repo
                  prefix = "models"
                  if task.repo_type == "dataset": prefix = "datasets"
                  elif task.repo_type == "space": prefix = "spaces"
                  repo_subdir = f"{prefix}--{task.repo_id.replace('/', '--')}"
                  download_dir = download_dir / repo_subdir
              else:
+                 # Cache Structure
                  import os
                  hf_home = os.getenv("HF_HOME", os.path.expanduser("~/.cache/huggingface/hub"))
-                 download_dir = Path(hf_home) / f"models--{task.repo_id.replace('/', '--')}"
+                 download_dir = Path(hf_home) / f"models--{task.repo_id.replace('/', '--')}" / "snapshots" / task.revision
             
              download_dir.mkdir(parents=True, exist_ok=True)
              
-             # Add URIs
+             if not files_to_download:
+                 with self._task_lock:
+                    task.status = DownloadStatus.COMPLETED
+                    task.progress = 100
+                    task.current_file = "Nothing to download (filtered)"
+                    self._notify_callbacks(task)
+                 return
+
+             # 4. Dispatch to Aria2
              gids = []
              token = self.api.token
              headers = {"Authorization": f"Bearer {token}"} if token else {}
@@ -995,8 +952,14 @@ class HFDownloader:
                      (download_dir / save_file).parent.mkdir(parents=True, exist_ok=True)
                      
                      options = {
-                         "dir": str(download_dir.parent),
-                         "out": str(download_dir.name + "/" + save_file),
+                         "dir": str(download_dir.parent), # Aria2 takes dir, writes file relative? No, aria2 "dir" is base.
+                         # Wait, if we pass "out", it's relative to "dir"?
+                         # "out": filename.  If filename has dirs, aria2 creates them IF relative?
+                         # Safe way: dir = absolute path to file's parent? 
+                         # But files are in subdirs.
+                         # Better: dir = Root of repo snapshot. out = "folder/file.txt"
+                         "dir": str(download_dir),
+                         "out": save_file, # "folder/file.ext"
                          "max-connection-per-server": "16",
                          "split": "16",
                          "min-split-size": "1M"
@@ -1015,6 +978,7 @@ class HFDownloader:
                  except Exception as e:
                      logger.error(f"Batch Dispatch Failed: {e}")
                      raise
+                     
              self.aria2_gids[task_id] = gids
              
              # Start a monitor loop for this task
