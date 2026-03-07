@@ -28,6 +28,7 @@ class SettingsResponse(BaseModel):
     resolved_hf_cache_dir: str
     hf_cache_history: List[str] = []
     proxy_url: Optional[str] = ""
+    use_system_proxy: bool = False
     check_update_on_start: bool = True
     auto_start: bool = False
     llama_cpp_path: Optional[str] = ""
@@ -59,6 +60,7 @@ class UpdateSettingsRequest(BaseModel):
     mirror_key: Optional[str] = None
     hf_cache_dir: Optional[str] = None
     proxy_url: Optional[str] = None
+    use_system_proxy: Optional[bool] = None
     check_update_on_start: Optional[bool] = None
     llama_cpp_path: Optional[str] = None
     download_method: Optional[str] = None

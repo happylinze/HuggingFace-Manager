@@ -30,13 +30,14 @@ class Config:
         'hf_cache_history': [],  # List of historical cache paths
         'download_dir_history': [], # List of historical download paths
         'proxy_url': '',  # HTTP Proxy URL (http://user:pass@host:port)
+        'use_system_proxy': False, # Whether to auto-detect system proxy if proxy_url is empty
         'check_update_on_start': True,
         'auto_start': False,
         'accounts': [],  # List of {username, token, avatar, fullname, email, is_pro}
         'download_method': 'PYTHON', # 'PYTHON' (Method A) or 'ARIA2' (Method B)
         'python_max_workers': 8, # Max threads for Python mode (per repo)
         'aria2_cache_structure': True, # True=HF Cache (blobs+symlink), False=Direct Folder
-        'aria2_port': 6810,
+        'aria2_port': 16800,
         'aria2_max_connection_per_server': 16,
         'aria2_split': 16, 
         'aria2_min_split_size': '1M',
@@ -124,11 +125,24 @@ class Config:
             os.environ["ALL_PROXY"] = proxy_url
             os.environ.pop("NO_PROXY", None)  # Remove bypass if proxy set
         else:
-            # FORCE Direct connection by setting NO_PROXY
-            os.environ.pop("HTTP_PROXY", None)
-            os.environ.pop("HTTPS_PROXY", None)
-            os.environ.pop("ALL_PROXY", None)
-            os.environ["NO_PROXY"] = "*"
+            use_sys = self.get('use_system_proxy', False)
+            if use_sys:
+                from urllib.request import getproxies
+                sys_proxies = getproxies()
+                if 'all' in sys_proxies:
+                    os.environ["ALL_PROXY"] = sys_proxies['all']
+                    os.environ["HTTP_PROXY"] = sys_proxies['all']
+                    os.environ["HTTPS_PROXY"] = sys_proxies['all']
+                elif 'https' in sys_proxies:
+                    os.environ["HTTPS_PROXY"] = sys_proxies['https']
+                    os.environ["HTTP_PROXY"] = sys_proxies['https']
+                os.environ.pop("NO_PROXY", None)
+            else:
+                # FORCE Direct connection by setting NO_PROXY
+                os.environ.pop("HTTP_PROXY", None)
+                os.environ.pop("HTTPS_PROXY", None)
+                os.environ.pop("ALL_PROXY", None)
+                os.environ["NO_PROXY"] = "*"
 
     def get_proxy_dict(self) -> Optional[dict]:
         """Get a proxy dictionary compatible with requests."""

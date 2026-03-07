@@ -121,7 +121,7 @@ class HFDownloader:
         
         # Initialize Aria2 Service
         from .aria2_manager import Aria2Service
-        self.aria2 = Aria2Service(port=self.config.get('aria2_port', 6800))
+        self.aria2 = Aria2Service(port=self.config.get('aria2_port', 16800))
         self.aria2_gids: dict[str, list[str]] = {} 
         
         # Initialize API 
@@ -566,7 +566,8 @@ class HFDownloader:
                     has_aria2 = any(target_path.glob("*.aria2"))
                     
                     # If action is Check and NO partial markers -> Error
-                    if duplicate_action == 'check' and not has_aria2:
+                    # EXCEPT if user explicitly requests specific files (include_patterns is not empty)
+                    if duplicate_action == 'check' and not has_aria2 and not include_patterns:
                          raise DuplicateDownloadError(f"Target directory exists: {target_path}", str(target_path))
                 
                 resolved_local_dir = str(target_path)
@@ -597,13 +598,58 @@ class HFDownloader:
         self.save_queue()
         return task_id
 
+    def _check_proxy_health(self, proxy_url: str) -> tuple[bool, str]:
+        if not proxy_url:
+            return True, ""
+        import urllib.parse
+        import socket
+        try:
+            parsed = urllib.parse.urlparse(proxy_url)
+            host = parsed.hostname
+            # Default proxy port if missing
+            port = parsed.port or 80
+            if not host:
+                return False, f"Invalid proxy URL: {proxy_url}"
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(2.0)
+            s.connect((host, port))
+            s.close()
+            return True, ""
+        except Exception as e:
+            # Check for standard WinError 10061 message
+            if "10061" in str(e):
+                err = "Connection Refused. Target machine actively refused it."
+            else:
+                err = str(e)
+            return False, f"Proxy ({proxy_url}) is unreachable: {err}. Please check your VPN software or disable proxy in settings."
+
     def start_download(self, task_id: str) -> bool:
+        # Check proxy health before starting
+        proxy_url = self.config.get('proxy_url')
+        use_system_proxy = self.config.get('use_system_proxy', False)
+        
+        # If no explicit proxy but system proxy is enabled, detect it for health check
+        effective_proxy = proxy_url
+        if not effective_proxy and use_system_proxy:
+            from urllib.request import getproxies
+            sys_proxies = getproxies()
+            effective_proxy = sys_proxies.get('all') or sys_proxies.get('https') or sys_proxies.get('http')
+        
+        is_healthy, err_msg = self._check_proxy_health(effective_proxy)
+        
         with self._task_lock:
             if task_id not in self._tasks:
                 return False
             task = self._tasks[task_id]
             if task.status not in (DownloadStatus.PENDING, DownloadStatus.PAUSED, DownloadStatus.FAILED, DownloadStatus.CANCELLED):
                 # We allow restarting Failed/Cancelled tasks too
+                return False
+            
+            if not is_healthy:
+                task.status = DownloadStatus.FAILED
+                task.error_message = err_msg
+                self._notify_callbacks(task)
+                self.save_queue()
                 return False
             
             task.status = DownloadStatus.DOWNLOADING
@@ -677,7 +723,8 @@ class HFDownloader:
                 endpoint,
                 token,
                 self.config.get('python_max_workers', 8),
-                self.config.get('proxy_url')
+                self.config.get('proxy_url'),
+                self.config.get('use_system_proxy', False)
             )
         )
         p.start()
@@ -962,7 +1009,11 @@ class HFDownloader:
                          "out": save_file, # "folder/file.ext"
                          "max-connection-per-server": "16",
                          "split": "16",
-                         "min-split-size": "1M"
+                         "min-split-size": "1M",
+                         "continue": "true",
+                         "auto-file-renaming": "false",
+                         "allow-overwrite": "true",
+                         "file-allocation": "none"
                      }
                      if headers:
                           options["header"] = [f"{k}: {v}" for k, v in headers.items()]
@@ -973,11 +1024,20 @@ class HFDownloader:
                      })
                  
                  try:
+                     # Increase timeout specifically for large batch multicalls
                      chunk_gids = self.aria2.multicall(calls)
                      gids.extend(chunk_gids)
                  except Exception as e:
-                     logger.error(f"Batch Dispatch Failed: {e}")
-                     raise
+                     logger.warning(f"Batch Dispatch Failed, retrying once: {e}")
+                     import time
+                     time.sleep(2)
+                     try:
+                         # Retry chunk
+                         chunk_gids = self.aria2.multicall(calls)
+                         gids.extend(chunk_gids)
+                     except Exception as e2:
+                         logger.error(f"Batch Dispatch Failed on retry: {e2}")
+                         raise e2
                      
              self.aria2_gids[task_id] = gids
              

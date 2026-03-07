@@ -88,6 +88,7 @@ export interface Settings {
     hf_cache_history: string[];
     download_dir_history: string[];
     proxy_url?: string;
+    use_system_proxy?: boolean;
     check_update_on_start?: boolean;
     auto_start?: boolean;
     user_info: UserInfo | null;
@@ -349,6 +350,7 @@ export async function updateSettings(settings: {
     max_concurrent_downloads?: number;
     default_search_limit?: number;
     proxy_url?: string;
+    use_system_proxy?: boolean;
     check_update_on_start?: boolean;
     auto_start?: boolean;
     llama_cpp_path?: string;

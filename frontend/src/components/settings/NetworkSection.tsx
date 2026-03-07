@@ -287,6 +287,25 @@ export function NetworkSection({ settings, onUpdate, refreshSettings }: NetworkS
                         <p className="text-xs text-[var(--color-text-muted)] mt-1">
                             {t('settingsPage.network.proxyDesc')}
                         </p>
+
+                        {/* Use System Proxy Toggle */}
+                        <div className="flex items-center justify-between mt-4 p-3 -mx-3 rounded-xl hover:bg-[var(--color-surface-hover)] transition-colors border border-transparent hover:border-[var(--color-border)]">
+                            <div>
+                                <div className="font-medium text-[var(--color-text)]">
+                                    {t('settingsPage.network.useSystemProxy') || 'Use System Proxy'}
+                                </div>
+                                <div className="text-sm text-[var(--color-text-muted)] mt-0.5">
+                                    {t('settingsPage.network.useSystemProxyDesc') || 'Automatically detect and use Windows system proxy (e.g. VPN global mode)'}
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => onUpdate({ use_system_proxy: !settings.use_system_proxy })}
+                                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2
+                                        ${settings.use_system_proxy ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]'}`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ease-in-out ${settings.use_system_proxy ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>

@@ -35,7 +35,8 @@ export const zh = {
         language: '语言 / Language',
 
         browse: '浏览...',
-        default: '恢复默认'
+        default: '恢复默认',
+        noResults: '暂无结果'
     },
     nav: {
         search: '搜索',
@@ -367,6 +368,8 @@ export const zh = {
         network: {
             proxyTitle: '全局 HTTP 代理',
             proxyDesc: '适用于所有网络请求 (搜索、登录、原生下载)',
+            useSystemProxy: '使用系统代理',
+            useSystemProxyDesc: '自动接管 Windows 系统代理设置 (适用于 VPN 全局接管模式)',
             tokenLabel: 'Hugging Face 访问令牌'
         },
         tools: {

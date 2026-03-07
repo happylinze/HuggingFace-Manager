@@ -75,6 +75,7 @@ async def get_settings(
         "resolved_hf_cache_dir": resolved_cache,
         "hf_cache_history": downloader.config.get('hf_cache_history', []),
         "proxy_url": downloader.config.get('proxy_url', ''),
+        "use_system_proxy": downloader.config.get('use_system_proxy', False),
         "check_update_on_start": downloader.config.get('check_update_on_start', True),
         "llama_cpp_path": downloader.config.get('llama_cpp_path', ''),
         "auto_start": is_auto_start,
@@ -135,6 +136,11 @@ async def update_settings(
         
         if req.proxy_url is not None:
             downloader.config.set('proxy_url', req.proxy_url)
+            downloader.config.apply_env_proxy()
+            should_refresh_api = True
+            
+        if req.use_system_proxy is not None:
+            downloader.config.set('use_system_proxy', req.use_system_proxy)
             downloader.config.apply_env_proxy()
             should_refresh_api = True
             

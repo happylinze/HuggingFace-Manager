@@ -16,7 +16,7 @@ class Aria2Service:
     """
     Manages the local Aria2c process and provides a JSON-RPC client.
     """
-    def __init__(self, port: int = 6810, token: str = "hfmanager_secret"):
+    def __init__(self, port: int = 16800, token: str = "hfmanager_secret"):
         self.port = port
         self.secret = token
         self.rpc_url = f"http://127.0.0.1:{port}/jsonrpc"
@@ -107,23 +107,14 @@ class Aria2Service:
         check_cert = 'true' if config.get('aria2_check_certificate', False) else 'false'
         proxy = config.get('aria2_all_proxy', '')
 
-        # Auto-detect System Proxy (e.g. Clash/VPN) if not explicitly set
-        if not proxy:
-            try:
-                from urllib.request import getproxies
-                sys_proxies = getproxies()
-                # Prioritize 'all' > 'https' > 'http'
-                if 'all' in sys_proxies: 
-                    proxy = sys_proxies['all']
-                    logger.info(f"Aria2: Auto-detected System Proxy (all): {proxy}")
-                elif 'https' in sys_proxies and 'https://' in self.rpc_url: # Not strict, just heuristics
-                    proxy = sys_proxies['https']
-                    logger.info(f"Aria2: Auto-detected System Proxy (https): {proxy}")
-                elif 'http' in sys_proxies:
-                    proxy = sys_proxies['http']
-                    logger.info(f"Aria2: Auto-detected System Proxy (http): {proxy}")
-            except Exception as e:
-                logger.warning(f"Failed to detect system proxy: {e}")
+        # We NO LONGER auto-detect system proxy to inject statically into Aria2's command line!
+        # This prevents Aria2 from permanently hanging if the user turns off their VPN while the app is running.
+        # If the user has a VPN (TUN mode), direct connection handles it perfectly.
+        # If the user explicitly sets 'aria2_all_proxy', we use it.
+        if proxy:
+            logger.info(f"Aria2: Using Custom Proxy: {proxy}")
+        else:
+            logger.info("Aria2: No Proxy Configured -> Forcing Direct Connection")
         
         cmd = [
             str(binary),
@@ -142,8 +133,12 @@ class Aria2Service:
             f"--reuse-uri={'true' if config.get('aria2_reuse_uri', True) else 'false'}",
             "--connect-timeout=60", # Robust timeout
             "--timeout=60",
-            "--max-tries=20",       # More retries
-            "--retry-wait=3"        # Wait between retries
+            "--retry-wait=3",       # Wait between retries
+            "--continue=true",      # Crucial for preventing fake completion
+            "--auto-file-renaming=false",
+            "--allow-overwrite=true",
+            "--file-allocation=none", # Crucial! Prevents Aria2 from freezing for 20+ seconds on large models while allocating space
+            "--rpc-max-request-size=10M" # Prevent large batch requests from being rejected
         ]
         
         if proxy:

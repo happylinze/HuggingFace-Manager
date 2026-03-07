@@ -35,7 +35,8 @@ export const en = {
         language: 'Language / 语言',
 
         browse: 'Browse...',
-        default: 'Default'
+        default: 'Default',
+        noResults: 'No results found'
     },
     nav: {
         search: 'Search',
@@ -367,6 +368,8 @@ export const en = {
         network: {
             proxyTitle: 'Global HTTP Proxy',
             proxyDesc: 'Applies to all network requests (Search, Login, Native)',
+            useSystemProxy: 'Use System Proxy',
+            useSystemProxyDesc: 'Automatically detect and use Windows system proxy (e.g. VPN global mode)',
             tokenLabel: 'HF Access Token'
         },
         tools: {

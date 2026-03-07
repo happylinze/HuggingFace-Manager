@@ -38,7 +38,8 @@ def download_worker_entry(
     endpoint: Optional[str] = None,
     token: Optional[str] = None,
     max_workers: Optional[int] = None,
-    proxy_url: Optional[str] = None
+    proxy_url: Optional[str] = None,
+    use_system_proxy: bool = False
 ):
     """
     Entry point for the download worker process.
@@ -58,31 +59,31 @@ def download_worker_entry(
             os.environ["HTTPS_PROXY"] = proxy_url
             os.environ["ALL_PROXY"] = proxy_url
             logger.info(f"Proxy Configured in Worker: {proxy_url}")
+        elif use_system_proxy:
+            # User opted in to system proxy (VPN global mode)
+            from urllib.request import getproxies
+            sys_proxies = getproxies()
+            detected = sys_proxies.get('all') or sys_proxies.get('https') or sys_proxies.get('http')
+            if detected:
+                logger.info(f"Worker: Using System Proxy: {detected}")
+                os.environ["HTTP_PROXY"] = detected
+                os.environ["HTTPS_PROXY"] = detected
+                os.environ["ALL_PROXY"] = detected
+                os.environ.pop("NO_PROXY", None)
+            else:
+                logger.info("Worker: use_system_proxy=True but no system proxy found -> Direct")
+                os.environ.pop("HTTP_PROXY", None)
+                os.environ.pop("HTTPS_PROXY", None)
+                os.environ.pop("ALL_PROXY", None)
+                os.environ["NO_PROXY"] = "*"
         else:
-            # Check for hf-mirror specific bypass if requested (though we keep it simple for now)
-            # Re-detecting system proxy is good for process isolation safety
-            # Auto-detect System Proxy if not explicit
-            try:
-                from urllib.request import getproxies
-                sys_proxies = getproxies()
-                detected_proxy = None
-                
-                if 'all' in sys_proxies: 
-                    detected_proxy = sys_proxies['all']
-                elif 'https' in sys_proxies and (not endpoint or 'https' in endpoint):
-                    detected_proxy = sys_proxies['https']
-                elif 'http' in sys_proxies:
-                    detected_proxy = sys_proxies['http']
-                    
-                if detected_proxy:
-                    logger.info(f"Worker: Auto-detected System Proxy: {detected_proxy}")
-                    os.environ["HTTP_PROXY"] = detected_proxy
-                    os.environ["HTTPS_PROXY"] = detected_proxy
-                    os.environ["ALL_PROXY"] = detected_proxy
-                else:
-                    logger.info("No Proxy Configured in Worker (Direct Connection)")
-            except Exception as e:
-                logger.warning(f"Worker failed to detect system proxy: {e}")
+            # Explicitly force direct connection to bypass stale Windows system proxies
+            logger.info("No Proxy Configured in Worker -> Forcing Direct Connection")
+            os.environ.pop("HTTP_PROXY", None)
+            os.environ.pop("HTTPS_PROXY", None)
+            os.environ.pop("ALL_PROXY", None)
+            os.environ["NO_PROXY"] = "*"
+
 
         logger.info(f"Connecting to Endpoint: {os.environ.get('HF_ENDPOINT', 'Default')}")
 
