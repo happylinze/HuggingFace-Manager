@@ -152,8 +152,11 @@ class HFDownloader:
         self.config.apply_env_proxy()
         
         endpoint = os.environ.get('HF_ENDPOINT')
-        # HfApi reads environment variables (HTTP_PROXY/NO_PROXY) automatically
-        self.api = self.api_cls(endpoint=endpoint) if endpoint else self.api_cls()
+        # CRITICAL: HfApi() does NOT always auto-load the local token.
+        # We must explicitly read it and pass it in.
+        from huggingface_hub import HfFolder
+        token = HfFolder.get_token()
+        self.api = self.api_cls(endpoint=endpoint, token=token) if endpoint else self.api_cls(token=token)
 
     def _monitor_queue_loop(self):
         """Consume messages from worker processes and update task state."""
@@ -987,6 +990,12 @@ class HFDownloader:
              # 4. Dispatch to Aria2
              gids = []
              token = self.api.token
+             # Always pass Authorization headers. Both official huggingface.co and mirrors like
+             # hf-mirror.com correctly handle Bearer tokens. Gated repos REQUIRE auth even on mirrors.
+             # Note: If a gated repo returns 403, it means the user hasn't accepted the repo's license
+             # agreement on the HuggingFace website, not a header forwarding issue.
+             import huggingface_hub.constants
+             endpoint = huggingface_hub.constants.ENDPOINT
              headers = {"Authorization": f"Bearer {token}"} if token else {}
              
              batch_size = 50
@@ -994,17 +1003,23 @@ class HFDownloader:
                  chunk = files_to_download[i:i + batch_size]
                  calls = []
                  for f in chunk:
-                     url = hf_hub_url(repo_id=task.repo_id, filename=f.rfilename, revision=task.revision)
+                     import urllib.parse
+                     
+                     rev = urllib.parse.quote(task.revision, safe="")
+                     fname = urllib.parse.quote(f.rfilename)
+                     repo_type_prefix = ""
+                     
+                     if task.repo_type == "dataset":
+                         repo_type_prefix = "datasets/"
+                     elif task.repo_type == "space":
+                         repo_type_prefix = "spaces/"
+                         
+                     url = f"{endpoint}/{repo_type_prefix}{task.repo_id}/resolve/{rev}/{fname}"
+                     logger.debug(f"Queuing file {f.rfilename} to Aria2 with URL: {url}")
                      save_file = f.rfilename
                      (download_dir / save_file).parent.mkdir(parents=True, exist_ok=True)
                      
                      options = {
-                         "dir": str(download_dir.parent), # Aria2 takes dir, writes file relative? No, aria2 "dir" is base.
-                         # Wait, if we pass "out", it's relative to "dir"?
-                         # "out": filename.  If filename has dirs, aria2 creates them IF relative?
-                         # Safe way: dir = absolute path to file's parent? 
-                         # But files are in subdirs.
-                         # Better: dir = Root of repo snapshot. out = "folder/file.txt"
                          "dir": str(download_dir),
                          "out": save_file, # "folder/file.ext"
                          "max-connection-per-server": "16",
@@ -1054,137 +1069,179 @@ class HFDownloader:
                     self._notify_callbacks(task)
 
     def _monitor_aria2_task(self, task_id: str, gids: list[str]):
-        """Poll Aria2 Status."""
+        """Poll Aria2 Status using efficient API calls.
+        
+        Instead of querying all 5000 GIDs every cycle (667ms), we:
+        1. Use tellActive (~2ms) for active download speed/progress
+        2. Track completed/failed incrementally (a set, never re-queried)
+        3. Only batch-query remaining unknown GIDs periodically
+        """
+        # Speed smoothing: sliding window of recent samples for stable display
+        speed_history = []
+        SPEED_WINDOW = 5
+        
+        gid_set = set(gids)  # Our GIDs for this task
+        known_complete = set()  # GIDs confirmed complete — never re-query
+        known_failed = {}  # {gid: error_msg} — never re-query
+        known_done_bytes = {}  # {gid: totalLength} for completed GIDs
+        
         while True:
             try:
-                # Check status
-                total_done = 0
-                total_len = 0 # This will be sum of known GIDs
-                current_speed = 0
-                all_completed = True
-                any_failed = False
-                active_gids = 0
-                completed_files = 0
-                current_active_file = None
-                
-                # Batch status polling
-                batch_size = 50
-                all_statuses = []
-                for i in range(0, len(gids), batch_size):
-                    chunk = gids[i:i + batch_size]
-                    calls = [{"method": "tellStatus", "params": [gid]} for gid in chunk]
-                    try:
-                        chunk_statuses = self.aria2.multicall(calls)
-                        all_statuses.extend(chunk_statuses)
-                    except Exception as e:
-                        logger.warning(f"Batch Status Polling error: {e}")
-                        continue
-
-                for s in all_statuses:
-                    if isinstance(s, Exception) or not isinstance(s, dict):
-                        continue
-                        
-                    status = s['status']
-                    done = int(s['completedLength'])
-                    total = int(s['totalLength'])
-                    speed = int(s.get('downloadSpeed', 0))
-                    
-                    total_done += done
-                    total_len += total
-                    current_speed += speed
-                    
-                    if status == 'active' or status == 'waiting':
-                        active_gids += 1
-                        # Capture current file from the first active GID
-                        if not current_active_file and status == 'active':
-                             if 'files' in s and len(s['files']) > 0:
-                                 file_path = s['files'][0].get('path')
-                                 if file_path:
-                                     current_active_file = file_path
-
-                    if status == 'complete':
-                        completed_files += 1
-                    
-                    if status == 'error':
-                        any_failed = True
-                    if status != 'complete':
-                        all_completed = False
-                
-                # Debug logging specifically for speed issues (throttle to once every 5s)
-                # if current_speed == 0 and active_gids > 0:
-                #     logger.debug(f"Aria2 Speed 0? Status sample: {s}")
-
+                # --- 0. Check Cancel/Pause FIRST (before any expensive polling) ---
                 with self._task_lock:
-                    if task_id not in self._tasks: break
+                    if task_id not in self._tasks:
+                        break
                     task = self._tasks[task_id]
                     
-                    # Handle Cancel/Pause from External
                     if task.status == DownloadStatus.CANCELLED:
-                         for gid in gids: 
-                             try: self.aria2.remove(gid) 
-                             except: pass
-                         break
+                        for gid in gids:
+                            try: self.aria2.remove(gid)
+                            except: pass
+                        break
+                    
                     if task.status == DownloadStatus.PAUSED:
-                         if active_gids > 0:
-                             for gid in gids:
-                                 try: self.aria2.pause(gid)
-                                 except: pass
-                         time.sleep(1)
-                         continue
+                        # Pause only active GIDs (fast path)
+                        try:
+                            active_list = self.aria2.tell_active()
+                            for s in active_list:
+                                if s.get('gid') in gid_set:
+                                    try: self.aria2.pause(s['gid'])
+                                    except: pass
+                        except:
+                            pass
+                        time.sleep(0.3)
+                        continue
+                
+                # --- 1. Fast path: get active downloads (~2ms) ---
+                current_speed = 0
+                active_done = 0
+                active_total = 0
+                active_count = 0
+                waiting_count = 0
+                current_active_file = None
+                
+                try:
+                    active_list = self.aria2.tell_active()
+                    for s in active_list:
+                        gid = s.get('gid')
+                        if gid not in gid_set:
+                            continue  # Not our task
+                        
+                        active_count += 1
+                        done = int(s.get('completedLength', 0))
+                        total = int(s.get('totalLength', 0))
+                        
+                        active_done += done
+                        active_total += total
+                        
+                        # Capture current file from first active GID
+                        if not current_active_file:
+                            if 'files' in s and len(s['files']) > 0:
+                                file_path = s['files'][0].get('path')
+                                if file_path:
+                                    current_active_file = file_path
+                except Exception as e:
+                    logger.warning(f"tellActive error: {e}")
+                
+                # Count waiting GIDs and get accurate global speed
+                try:
+                    gstat = self.aria2.get_global_stat()
+                    waiting_count = int(gstat.get('numWaiting', 0))
+                    current_speed = int(gstat.get('downloadSpeed', 0))
+                except:
+                    pass
+                
+                # --- 2. Track completed/failed via tellStopped (~2ms, every cycle) ---
+                try:
+                    # tellStopped returns all stopped (complete+error) downloads
+                    # We paginate in case there are many
+                    offset = 0
+                    while True:
+                        stopped = self.aria2.tell_stopped(offset, 500)
+                        if not stopped:
+                            break
+                        for s in stopped:
+                            gid = s.get('gid')
+                            if gid not in gid_set or gid in known_complete or gid in known_failed:
+                                continue  # Not ours, or already tracked
+                            status = s.get('status')
+                            if status == 'complete':
+                                known_complete.add(gid)
+                                known_done_bytes[gid] = int(s.get('totalLength', 0))
+                            elif status == 'error':
+                                code = s.get('errorCode', 'Unknown')
+                                msg = s.get('errorMessage', 'No message')
+                                known_failed[gid] = f"GID {gid[:6]}: Code {code} - {msg}"
+                        if len(stopped) < 500:
+                            break
+                        offset += 500
+                except Exception as e:
+                    logger.warning(f"tellStopped error: {e}")
+                
+                # --- 3. Aggregate totals ---
+                completed_files = len(known_complete)
+                total_done = active_done + sum(known_done_bytes.values())
+                any_failed = len(known_failed) > 0
+                all_completed = (completed_files + len(known_failed)) >= len(gids) and active_count == 0 and waiting_count == 0
+                
+                # --- 4. Update task state ---
+                with self._task_lock:
+                    if task_id not in self._tasks:
+                        break
+                    task = self._tasks[task_id]
+                    
+                    # Re-check cancel/pause (may have changed during polling)
+                    if task.status == DownloadStatus.CANCELLED:
+                        for gid in gids:
+                            try: self.aria2.remove(gid)
+                            except: pass
+                        break
 
                     # Update Progress
                     task.downloaded_size = total_done
-                    task.speed = current_speed
-                    task.speed_formatted = f"{format_size(current_speed)}/s"
+                    
+                    # Smooth speed using weighted moving average
+                    speed_history.append(current_speed)
+                    if len(speed_history) > SPEED_WINDOW:
+                        speed_history.pop(0)
+                    if speed_history:
+                        weights = list(range(1, len(speed_history) + 1))
+                        weights[-1] *= 2
+                        smoothed_speed = sum(s * w for s, w in zip(speed_history, weights)) / sum(weights)
+                    else:
+                        smoothed_speed = current_speed
+                    
+                    task.speed = int(smoothed_speed)
+                    task.speed_formatted = f"{format_size(int(smoothed_speed))}/s"
                     task.downloaded_files = completed_files
                     
                     # Update Current File
                     if current_active_file:
                         try:
-                            # Try to make relative to result_path
                             if task.result_path and current_active_file.startswith(str(task.result_path)):
                                 task.current_file = current_active_file.replace(str(task.result_path), "").lstrip("/\\")
                             else:
-                                # Fallback to basename
                                 task.current_file = os.path.basename(current_active_file)
                         except:
-                             task.current_file = os.path.basename(current_active_file)
+                            task.current_file = os.path.basename(current_active_file)
                     elif all_completed:
                         task.current_file = None
-                    denom = task.total_size if task.total_size > 0 else total_len
+                    
+                    denom = task.total_size if task.total_size > 0 else (active_total + sum(known_done_bytes.values()))
                     
                     if denom > 0:
                         task.progress = min(100.0, (total_done / denom) * 100)
                     
-                    if any_failed:
+                    if any_failed and active_count == 0 and waiting_count == 0:
                         task.status = DownloadStatus.FAILED
-                        
-                        # Collect detailed errors
-                        error_details = []
-                        for gid in gids:
-                            try:
-                                s = self.aria2.get_status(gid)
-                                if s['status'] == 'error':
-                                    code = s.get('errorCode', 'Unknown')
-                                    msg = s.get('errorMessage', 'No message')
-                                    error_details.append(f"GID {gid[:6]}: Code {code} - {msg}")
-                            except:
-                                pass
-                                
+                        error_details = list(known_failed.values())
                         if not error_details:
-                           error_details.append("Typically network timeout or file IO error.")
-                           
-                        task.error_message = "Aria2 Error:\n" + "\n".join(error_details)
+                            error_details.append("Typically network timeout or file IO error.")
+                        task.error_message = "Aria2 Error:\n" + "\n".join(error_details[:20])  # Cap at 20 errors
                         self._notify_callbacks(task)
                         break
                     
-                    if all_completed and len(gids) > 0:
-                        # Transition to Verifying? Or Complete?
-                        # User asked about verification. 
-                        # Ideally we should verify. 
-                        # But for now, let's just mark complete to fix the immediate "stuck" feeling.
-                        # We can add a "verifying" step later or now.
-                        
+                    if all_completed and len(gids) > 0 and not any_failed:
                         task.status = DownloadStatus.COMPLETED
                         task.progress = 100.0
                         task.downloaded_size = denom
@@ -1195,7 +1252,7 @@ class HFDownloader:
                         
                     self._notify_callbacks(task)
                 
-                time.sleep(1)
+                time.sleep(0.5)
             except Exception:
                 break
 

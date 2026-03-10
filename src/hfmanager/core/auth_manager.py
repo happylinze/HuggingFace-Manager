@@ -38,9 +38,11 @@ class AuthManager:
     def __init__(self):
         import os
         from ..utils.config import get_config
+        from huggingface_hub import HfFolder
         self.config = get_config()
         endpoint = os.environ.get('HF_ENDPOINT')
-        self.api = HfApi(endpoint=endpoint) if endpoint else HfApi()
+        token = HfFolder.get_token()
+        self.api = HfApi(endpoint=endpoint, token=token) if endpoint else HfApi(token=token)
         
         # Sync current system token with known accounts
         self._sync_current_user()
@@ -48,8 +50,10 @@ class AuthManager:
     def refresh_api(self):
         """Re-initialize API client (e.g. after mirror switch)."""
         import os
+        from huggingface_hub import HfFolder
         endpoint = os.environ.get('HF_ENDPOINT')
-        self.api = HfApi(endpoint=endpoint) if endpoint else HfApi()
+        token = HfFolder.get_token()
+        self.api = HfApi(endpoint=endpoint, token=token) if endpoint else HfApi(token=token)
 
     def _sync_current_user(self):
         """Check current system token and ensure it's in our accounts list."""

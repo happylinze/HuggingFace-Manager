@@ -152,7 +152,8 @@ function AppContent() {
 
         const pollInterval = setInterval(fetchDownloads, 3000);
 
-        const wsUrl = 'ws://127.0.0.1:8000/ws/progress';
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws/progress`;
         let ws: WebSocket | null = null;
 
         const connectWs = () => {

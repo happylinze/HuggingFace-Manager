@@ -21,6 +21,13 @@ class Aria2Service:
         self.secret = token
         self.rpc_url = f"http://127.0.0.1:{port}/jsonrpc"
         self._process: Optional[subprocess.Popen] = None
+        
+        # PROACTIVE FIX: Initialize a globally persistent, Keep-Alive HTTP Session purely for Aria2 RPC.
+        # This completely eliminates Windows TCP TIME_WAIT port exhaustion when the UI aggressively polls 
+        # thousands of files, and stops Aria2's single-threaded event loop from hanging on TCP Handshakes.
+        self._session = requests.Session()
+        self._session.trust_env = False
+        
         self._cleanup_zombie_processes()
         self._ensure_process_running()
 
@@ -88,7 +95,7 @@ class Aria2Service:
             
         # Check if port is already taken (maybe external aria2 running)
         try:
-            requests.get(self.rpc_url, timeout=0.5, proxies={"http": None, "https": None})
+            self._session.get(self.rpc_url, timeout=0.5, proxies={"http": None, "https": None})
             logger.info(f"Aria2 already running on port {self.port}")
             return
         except:
@@ -133,7 +140,9 @@ class Aria2Service:
             f"--reuse-uri={'true' if config.get('aria2_reuse_uri', True) else 'false'}",
             "--connect-timeout=60", # Robust timeout
             "--timeout=60",
+            "--max-tries=5",        # Auto-retry on transient SSL/network failures
             "--retry-wait=3",       # Wait between retries
+            "--max-concurrent-downloads=5", # Limit concurrent file downloads to avoid overwhelming mirror with SSL handshakes
             "--continue=true",      # Crucial for preventing fake completion
             "--auto-file-renaming=false",
             "--allow-overwrite=true",
@@ -148,10 +157,14 @@ class Aria2Service:
             # CREATE_NO_WINDOW = 0x08000000
             creationflags = 0x08000000 if os.name == 'nt' else 0
             
+            # CORE FIX: NEVER use subprocess.PIPE unless you have a dedicated thread actively reading from it!
+            # If the user's VPN disconnects and Aria2 spews network errors, the 64KB OS Pipe buffer fills instantly.
+            # Aria2 then blocks synchronously on its internal `printf`, permanently freezing its single-threaded 
+            # JSON-RPC event loop, leading to the mysterious and unrecoverable 20s Read Timeouts.
             self._process = subprocess.Popen(
                 cmd, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL, 
+                stderr=subprocess.DEVNULL,
                 creationflags=creationflags,
                 text=True
             )
@@ -163,15 +176,13 @@ class Aria2Service:
             for _ in range(max_retries):
                 # 1. Check if process died
                 if self._process.poll() is not None:
-                    _, stderr = self._process.communicate()
                     logger.error(f"Aria2 exited immediately with code {self._process.returncode}")
-                    logger.error(f"STDERR: {stderr}")
                     self._process = None
                     return # Startup failed
                 
                 # 2. Check if port is listening (Health Check)
                 try:
-                    requests.get(self.rpc_url, timeout=0.1, proxies={"http": None, "https": None})
+                    self._session.get(self.rpc_url, timeout=0.1, proxies={"http": None, "https": None})
                     startup_success = True
                     break
                 except:
@@ -186,7 +197,10 @@ class Aria2Service:
             logger.error(f"Failed to start Aria2: {e}")
 
     def call(self, method: str, params: List[Any]) -> Any:
-        """Execute JSON-RPC call."""
+        """Execute JSON-RPC call with auto-restart."""
+        # Proactively ensure Aria2 is alive before every call
+        self._ensure_process_running()
+        
         payload = {
             "jsonrpc": "2.0",
             "id": "hfmanager",
@@ -194,27 +208,34 @@ class Aria2Service:
             "params": [f"token:{self.secret}"] + params
         }
         
-        try:
-            # Force direct connection to localhost, ignore system proxies/VPNs
-            resp = requests.post(
-                self.rpc_url, 
-                json=payload, 
-                timeout=10, 
-                proxies={"http": None, "https": None}
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            if "error" in data:
-                raise Exception(f"Aria2 RPC Error: {data['error']}")
-            return data["result"]
-        except requests.exceptions.ConnectionError:
-            # Maybe crashed? Restart
-            logger.warning("Aria2 connection failed, restarting...")
-            self._ensure_process_running()
-            raise
+        for attempt in range(2):  # Retry once on connection failure
+            try:
+                resp = self._session.post(
+                    self.rpc_url, 
+                    json=payload, 
+                    timeout=10, 
+                    proxies={"http": None, "https": None}
+                )
+                
+                resp.raise_for_status()
+                data = resp.json()
+                if "error" in data:
+                    raise Exception(f"Aria2 RPC Error: {data['error']}")
+                return data["result"]
+            except requests.exceptions.ConnectionError:
+                if attempt == 0:
+                    logger.warning("Aria2 connection failed, restarting and retrying...")
+                    self._process = None  # Force restart
+                    self._ensure_process_running()
+                    import time; time.sleep(1)
+                else:
+                    raise
 
     def multicall(self, calls: List[Dict[str, Any]]) -> List[Any]:
         """Execute multiple JSON-RPC calls in one request using system.multicall."""
+        # Proactively ensure Aria2 is alive before every call
+        self._ensure_process_running()
+        
         formatted_calls = []
         for c in calls:
             method = c["method"]
@@ -228,27 +249,41 @@ class Aria2Service:
             "params": [formatted_calls]
         }
         
-        try:
-            resp = requests.post(
-                self.rpc_url, 
-                json=payload, 
-                timeout=20, # Higher timeout for batch
-                proxies={"http": None, "https": None}
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            if "error" in data:
-                raise Exception(f"Aria2 Multicall Error: {data['error']}")
-            
-            # system.multicall returns a list of results, each wrapped in a list
-            results = []
-            for item in data.get("result", []):
-                # If error, result will be a dict with 'code' and 'message'
-                results.append(item[0] if isinstance(item, list) and len(item) > 0 else item)
-            return results
-        except Exception as e:
-            logger.error(f"Aria2 Multicall Failed: {e}")
-            raise
+        for attempt in range(2):  # Retry once on connection failure
+            try:
+                resp = self._session.post(
+                    self.rpc_url, 
+                    json=payload, 
+                    timeout=20,
+                    proxies={"http": None, "https": None}
+                )
+                
+                try:
+                    resp.raise_for_status()
+                except requests.exceptions.HTTPError as e:
+                    logger.error(f"Aria2 HTTP Error {resp.status_code}: {resp.text}")
+                    raise Exception(f"Aria2 RPC Error: {resp.text}") from e
+                    
+                data = resp.json()
+                if "error" in data:
+                    raise Exception(f"Aria2 Multicall Error: {data['error']}")
+                
+                results = []
+                for item in data.get("result", []):
+                    results.append(item[0] if isinstance(item, list) and len(item) > 0 else item)
+                return results
+            except requests.exceptions.ConnectionError:
+                if attempt == 0:
+                    logger.warning("Aria2 multicall connection failed, restarting and retrying...")
+                    self._process = None  # Force restart
+                    self._ensure_process_running()
+                    import time; time.sleep(1)
+                else:
+                    logger.error("Aria2 Multicall Failed after restart retry")
+                    raise
+            except Exception as e:
+                logger.error(f"Aria2 Multicall Failed: {e}")
+                raise
 
     def add_uri(self, 
                 uris: List[str], 
@@ -298,6 +333,22 @@ class Aria2Service:
         
     def get_status(self, gid: str):
         return self.call("tellStatus", [gid])
+    
+    def tell_active(self):
+        """Get all active downloads. Returns list of status dicts. ~2ms regardless of total GID count."""
+        return self.call("tellActive", [])
+    
+    def tell_waiting(self, offset: int = 0, num: int = 1000):
+        """Get waiting downloads."""
+        return self.call("tellWaiting", [offset, num])
+    
+    def tell_stopped(self, offset: int = 0, num: int = 1000):
+        """Get stopped (complete/error) downloads."""
+        return self.call("tellStopped", [offset, num])
+    
+    def get_global_stat(self):
+        """Get global download stats (speed, active/waiting/stopped counts). ~1ms."""
+        return self.call("getGlobalStat", [])
         
     def update_options(self, options: Dict[str, str]):
         """Update global options via RPC."""

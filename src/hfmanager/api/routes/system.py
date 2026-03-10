@@ -11,97 +11,38 @@ class SelectFolderResponse(BaseModel):
     path: Optional[str]
 
 @router.post("/select-folder", response_model=SelectFolderResponse)
-async def select_folder():
+def select_folder():
     """Open a system folder selection dialog."""
     try:
-        # Python script to run in a separate process
-        py_script = """
-import tkinter as tk
-from tkinter import filedialog
-import sys
-
-def select():
-    root = tk.Tk()
-    root.withdraw()  # Hide main window
-    root.attributes('-topmost', True)  # Make sure dialog is on top
-    
-    path = filedialog.askdirectory(title="选择下载目录")
-    if path:
-        print(path, end='')
-    
-    root.destroy()
-
-if __name__ == "__main__":
-    select()
-"""
+        import tkinter as tk
+        from tkinter import filedialog
         
-        # Run python script
-        import sys
+        root = tk.Tk()
+        root.withdraw()  # Hide main window
+        root.attributes('-topmost', True)  # Make sure dialog is on top
         
-        # Use simple creation flags to avoid console window flashing if possible
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        path = filedialog.askdirectory(title="选择下载目录")
         
-        result = subprocess.run(
-            [sys.executable, "-c", py_script],
-            capture_output=True,
-            text=True,
-            startupinfo=startupinfo,
-            check=False
-        )
-        
-        path = result.stdout.strip()
-        # On Windows path might be printed with \r\n, strip it
-        path = path.replace('\r', '').replace('\n', '')
-        
+        root.destroy()
         return {"path": path if path else None}
-        
-    except Exception as e:
-        return {"path": path if path else None}
-        
     except Exception as e:
         return {"path": None}
 
 @router.post("/select-file", response_model=SelectFolderResponse)
-async def select_file():
+def select_file():
     """Open a system file selection dialog."""
     try:
-        py_script = """
-import tkinter as tk
-from tkinter import filedialog
-import sys
-
-def select():
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes('-topmost', True)
-    
-    path = filedialog.askopenfilename(title="选择文件")
-    if path:
-        print(path, end='')
-    
-    root.destroy()
-
-if __name__ == "__main__":
-    select()
-"""
-        import sys
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        import tkinter as tk
+        from tkinter import filedialog
         
-        result = subprocess.run(
-            [sys.executable, "-c", py_script],
-            capture_output=True,
-            text=True,
-            startupinfo=startupinfo,
-            check=False
-        )
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
         
-        path = result.stdout.strip()
-        path = path.replace('\r', '').replace('\n', '')
+        path = filedialog.askopenfilename(title="选择文件")
         
+        root.destroy()
         return {"path": path if path else None}
-        
     except Exception as e:
         return {"path": None}
 

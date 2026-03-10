@@ -151,6 +151,22 @@ class MirrorManager:
         # Set environment variable
         os.environ[self.ENV_VAR] = mirror.url
         
+        # PROACTIVE FIX: Monkey-patch huggingface_hub globally for all scattered HfApi() instances
+        # Without this, all dynamic HfApi() calls bypass the mirror completely!
+        try:
+            import huggingface_hub.constants
+            huggingface_hub.constants.ENDPOINT = mirror.url
+            
+            # PROACTIVE FIX: Clear cached requests.Session() to kill dead TCP sockets 
+            # This allows instantaneous recovery if the user toggles a VPN mid-session
+            try:
+                from huggingface_hub.utils._http import reset_sessions
+                reset_sessions()
+            except ImportError:
+                pass
+        except ImportError:
+            pass
+            
         # Also set HF_HUB_OFFLINE to False to ensure downloads work
         os.environ['HF_HUB_OFFLINE'] = '0'
         
